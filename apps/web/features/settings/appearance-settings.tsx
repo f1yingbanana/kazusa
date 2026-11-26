@@ -31,7 +31,7 @@ export function AppearanceSettings() {
   return (
     <SettingsPage
       title="Appearance"
-      description="Choose light or dark mode and the color palette for this browser."
+      description="Color mode and palette for this browser."
     >
       <SettingsSection
         title="Color mode"

@@ -1,11 +1,11 @@
-# The rebuild on ui-sdk (in progress)
+# The rebuild on ui-sdk
 
-Read before touching `apps/web/ui/`, `apps/web/features/` or `app/halo/`.
+Read before touching `apps/web/ui/` or `apps/web/features/`.
 
-The whole UI is being rebuilt on [ui-sdk](https://ui-sdk.dev) to move off
-shadcn. It is served at `/halo` until it's done, then `app/halo/page.tsx`
-replaces `app/page.tsx` and the old UI is deleted. Three layers, kept apart by
-`no-restricted-imports` in `apps/web/eslint.config.mjs`:
+The UI is rebuilt on [ui-sdk](https://ui-sdk.dev) and served at `/` (since
+2026-11-26). Only the setup pages (`components/setup/`, `components/auth/` and
+the shadcn kit in `components/ui/` they use) are still the old UI. Layers, kept
+apart by `no-restricted-imports` in `apps/web/eslint.config.mjs`:
 
 ```text
 ui/                      # our component library: generic, no Kazusa data
@@ -18,13 +18,13 @@ ui/                      # our component library: generic, no Kazusa data
                          #   with a camera that flies (van Wijk), glides (springs) and
                          #   coasts after a fling; reduced motion jumps. The world map uses it
 features/                # the app, built from ui/ and lib/ + hooks/
-  shell/                 # frame, top bar, clock, section nav, command palette, details panel
-  characters/ places/ chats/ world/   # one folder per kind of thing
-  legacy.ts              # the only import of components/: what is left to port
-  legacy.css             # maps --ui-* onto the shadcn tokens the borrowed pieces read
+  shell/                 # frame, sections, top bar, clock/, status bar + status/, More sheet,
+                         #   saves, visitor welcome, command palette, details panel
+  characters/ places/ chats/ world/ stats/ ...   # one folder per kind of thing
+components/              # the setup pages' old UI only (setup/, auth/, ui/)
 app/globals.css          # the one Tailwind build: tailwindcss, ui/tailwind.css, shadcn.css
-app/shadcn.css           # everything the old UI needs from Tailwind; goes with components/
-app/halo/                # the route; loads legacy.css and the font
+app/shadcn.css           # what the setup pages need from Tailwind; goes with components/
+app/layout.tsx           # fonts (the rounded face as --ui-font-face), Nuqs
 ```
 
 - **ui/** imports only React, ui-sdk, lucide and tailwind-merge (in `cx.ts`). No
@@ -32,10 +32,9 @@ app/halo/                # the route; loads legacy.css and the font
   (`presence`, `name`, `src`), never ids to look up. Never mention a franchise
   or a style name.
 - **features/** imports components from `ui/`, never `@ui-sdk/*` directly; add
-  or extend a `ui/` component instead. It reaches the old UI only through
-  `features/legacy.ts`. Porting a piece means moving its logic into `lib/` or
-  `hooks/` and its view into `ui/`/`features/`, then deleting its line there.
-- **components/, lib/, hooks/** never import `ui/` or `features/`.
+  or extend a `ui/` component instead (`TextButton` for a press that reads as
+  words). It never imports `components/`.
+- **components/** (setup) never imports `ui/` or `features/`.
 - Style with Tailwind classes, keyed on ui-sdk's state attributes. Use only what
   survives deleting `app/shadcn.css` (ESLint rejects the rest): the `ui-*`
   colours (`bg-ui-surface`, `text-ui-soft`, `inset-ring-ui-line`), `shadow-ui`,
@@ -46,10 +45,10 @@ app/halo/                # the route; loads legacy.css and the font
   since shadcn's base layer supplies one today. Join classes with `cx` from
   `ui/cx.ts` so a caller's class wins. Size icons with `[&_svg]:size-4` on the
   parent.
-- Finishing the move: delete `components/`, `features/legacy.*`,
-  `app/shadcn.css` and its import in `app/globals.css`, and shadcn's packages
-  (keep `tailwind-merge`); move `app/halo/` to the root. Nothing in `ui/` or
-  `features/` changes.
+- Finishing the move: rebuild the setup guide, start over and owner sign-in in
+  `features/setup/`, then delete `components/`, `app/shadcn.css` and its import
+  in `app/globals.css`, the Geist fonts in `app/layout.tsx`, and shadcn's
+  packages (keep `tailwind-merge`).
 - Before using ui-sdk, follow the `ui-sdk` skill and read
   `node_modules/@ui-sdk/react/docs/llms.txt`, then the page for each component
   you use (`docs/components/<name>.md`). To build a component ui-sdk doesn't
@@ -182,7 +181,7 @@ The new UI splits conversations by how they're held:
   `PlaceChip`, `ChatChip`, `chatIcon`, and `useChatTitle` now live in
   `features/entities/{chat-meta.ts,chips.tsx}` and are shared by World, Chats,
   Places, and Timeline; `AvatarCount` in `ui/avatar.tsx` is shared with the
-  world map clusters. Still borrowed: old Stage for sections not yet ported.
+  world map clusters.
 
 ## Timeline (2026-11-25)
 
@@ -282,8 +281,7 @@ The new UI splits conversations by how they're held:
   `media` slot for the face), lit when on, greyed when off, "Steps on" or "Steps
   off" on rows that would change, the played locked on. Search, All, None; the
   footer says what happens ("2 step on. They all start thinking right away,
-  reading 3 waiting messages first.") and the button how many changes. The old
-  `CastDialog` stays only for the old UI.
+  reading 3 waiting messages first.") and the button how many changes.
 - **Play as character** (`features/characters/play-as-dialog.tsx`, opened from
   anywhere by `openPlayDialog`): `ui/choose-list.tsx` (one answer on ui-sdk
   Listbox, found by typing; `PickList`'s sibling) with Watch (Observer) then the
@@ -295,13 +293,14 @@ The new UI splits conversations by how they're held:
   Field, its error in place of its description; `idProblem` and `pageId` in
   `lib/wiki/page-id.ts`), and Simulated (on: joins the cast offstage and the
   profile opens; off: only a person's page, opened in the Wiki to write). The
-  button says what it makes. The old `NewPageDialog` stays for the old Wiki.
+  button says what it makes.
 - The profile's scroll area sits a pixel inside the stage card: the card's
   outline is an inset ring, painted under its children, so the stuck tabs would
   otherwise cover it.
-- Editing still goes through the old UI: About and Looks open the Wiki tab,
-  Memory the old memory sheet. `PHASE_ICON` is exported from the Timeline stage
-  for the Story tab. Pure helpers: `lib/characters/cast-book.ts` (tested).
+- About and Looks open the Wiki tab to edit; the details panel's Memory opens
+  the profile's Memory tab (`wiki.part=memory`), the one place memory is read
+  and edited. `PHASE_ICON` is exported from the Timeline stage for the Story
+  tab. Pure helpers: `lib/characters/cast-book.ts` (tested).
 
 ## Dialog actions and waiting (2026-11-25)
 
@@ -322,3 +321,132 @@ The new UI splits conversations by how they're held:
   legacy/setup buttons) takes the icon's place and the label stays as it is
   ("Adding…", "Stopping", "Loading…" made the button jump and read as a new
   button).
+
+## Shell, status bar and clock (2026-11-26)
+
+- **Sections** are one list, `SECTIONS` in `features/shell/sections.ts`: id,
+  label, icon, the Stage, the Sidebar (if any), a rail Badge, the pane names,
+  `end` for Settings, and `narrow`, where a narrow screen puts the list: `pane`
+  (Chats, Wiki, Settings: the list in the stage's place, the stage reached from
+  it and left by a Back button), `sheet` (Timeline: land on the feed; its People
+  open as a bottom sheet from a button in its header), `tabs` (World: Who's
+  where | Map, compact, hidden while a talk is open). Stages get Back or the
+  list button from `ui/pane-nav.tsx` (`PaneBackButton` in the conversation, wiki
+  page and settings headers, `PaneListButton` in Timeline's); docked they render
+  nothing. No other registries are left: the live SSE dispatcher is
+  `lib/live/dispatch.ts`.
+- **Phones have no card around the stage**: it runs edge to edge (no radius,
+  ring or shadow below `md`); lists keep a small side inset.
+- **Rail** (`ui/nav-rail.tsx`): ui-sdk route Tabs, the same component as every
+  tab row: one pill (`TabsIndicator`) springs to the current section on the
+  shared curve, the selected icon inverting on it. Icons are named by tooltips.
+  Settings has no icon on the phone's bar, so there the pill hides and, coming
+  back, appears in place. (Navigation Menu's indicator was tried: it doesn't
+  re-measure when `current` moves.) Tooltips carry an arrow (`TooltipArrow` in
+  `ui/tooltip.tsx`).
+- **Narrow navigation slides** (`features/shell/slide.ts`): list ↔ stage moves
+  are view transitions of the element named `pane` only: deeper slides in from
+  the right, Back slides it out again; a World talk opened from the list slides
+  in (from the map it keeps its iris). Sections don't animate. Coming back to a
+  section opens the pane it was left on while its link is unchanged (Back to the
+  Wiki's index stays on the index).
+- **Bottom sheets close only from outside** (or their handle): a pick inside
+  never closes them unless it opens something else. The details sheet stays open
+  while its tabs switch; Timeline's Characters sheet is a filter and stays open
+  while following.
+- **One long-press pattern**: anything with actions on a thing (a message, a
+  wiki page in the index) uses `ui/context-menu.tsx`: right-click (or Shift+F10)
+  opens a compact menu on desktop, press-and-hold opens a bottom sheet of the
+  same actions on touch, titled with what was held. Never a hover toolbar or
+  popover on long press. A message's hover toolbar (`ui/line-actions.tsx`) is
+  for fine pointers only.
+- **Top bar**: the logo, which says "Nya~" when poked (and, about 1 in 170,
+  "Hiss!": `features/shell/logo.tsx`); centred, the clock, Saves and the world's
+  own states (`features/stats/world-values.tsx`); at the end Search (icon only
+  below `lg`) and the community links, each with a small arrow saying it leaves
+  for another site. On a phone: logo, centred clock, and the menu (hamburger).
+- **Status bar** (`features/shell/status-bar.tsx`, items in `status/`): what you
+  can press is primary-coloured text that underlines under the pointer
+  (danger-coloured for failures and wiki errors); what only reports is soft
+  text; a press that opens a list carries a chevron. Connection is a dot and a
+  word, no tooltip (out of touch, the owner can open Settings → Connection from
+  it). "You are <name> at <place>" (name opens Play as, or a visitor's welcome;
+  place selects it), update, wiki problems, failed turns, and **Who's busy** ("2
+  thinking · 1 writing · 4 waiting", a popover of them by group; plain "All
+  quiet" when nobody is). Status links are `TextButton`s, so agents see them.
+- **Menu** (`features/shell/more-menu.tsx`, phones): a Popover presented as a
+  sheet. You (face and name open your details; "at <place>" is a link; Switch
+  opens Play as), folds for Who's busy, Failed turns and The world (folds with
+  an `icon` take the list rows' inset, so titles and separators line up), then
+  update, wiki problems, Search, Save or load, Settings, and a footer with the
+  connection and community links. A dot on the trigger when something needs a
+  look.
+- **Clock** (`features/shell/clock/`): pause/resume beside the reading; the
+  popover's Speed row is pause, 1, 2, 5, 10, 60×, with what it means in real
+  time and, from 10×, that thinking still takes real time. Skip ahead: Next
+  (just after the next plan ends, named by person and kind: "When Hina finishes
+  studying"), 10 min, 1 h, 6 h (a night), 24 h, or a time of day ("Skip to"),
+  with how many people it wakes, and a Skip button. 3 hours or more, or 5 or
+  more woken, asks first (`SkipDialog`, answered Save first / Cancel / Confirm):
+  nothing happens in between and nobody is told; a burst of token use; their
+  needs move as if lived; no undo.
+- **Saves** (`features/shell/saves-dialog.tsx`): `SavesButton` beside the clock,
+  `SavesDialog` mounted once, opened by `openSavesDialog`; its button is Save
+  now.
+- **Toasts** are ui-sdk's (`ui/toast.tsx`). Actions take `onAction`; there is no
+  `toast.message`. Tests that fire toasts without the region mock `@/ui/toast`.
+- **Cut text opens in place** (`ui/clamp-text.tsx`): a place's or character's
+  description, a Recent line: pressed, it shows whole (links still work).
+- **Dropdowns fit what they show** (`SelectTrigger` is `w-fit max-w-full`).
+- **States** show who last set them, nothing while nobody has; Getting around
+  shows a way's first means only.
+- **Editing a page part ends at its foot**, never with a Done in the header:
+  Memory has Cancel (asks once if there are changes) and Save (saves, back to
+  reading); Looks, which saves as you go, has Close editor. A wiki page's title
+  and body glide inside the page, clipped by it (`ui-vt-clip`: nested view
+  transition groups).
+- **A talk shows only its current line**: the earlier-line bubbles above the
+  panel are gone; the transcript is the Scene | Transcript switch, or the
+  Transcript button in full screen.
+- **Task kinds are chips** (`features/entities/task-chip.tsx`) wherever one is
+  named in a sentence, under the category's own name: Next in the clock ("When
+  Hina finishes [studying] and decides what's next") and Timeline's started,
+  stopped, while and until. With an actor, pressing it opens their Timeline.
+- **Characters, not people**: wiki kind, tabs, chat members, limits and counts.
+- **Dividers only between real groups**: no line under a settings page's
+  description; single short lists are sections, not folds; folds are for long
+  help (bot setup, remote Gateway), chat sharing and file diffs.
+- **Phone wiki page**: Edit and Favorite go in the ⋯ menu (desktop: star, then
+  Edit, beside the tabs); a place's breadcrumb stays one line (outermost, …,
+  nearest); the infobox shows only on Page.
+- **Phone Timeline** lands on the feed (Characters open as a sheet) and gives
+  the time column to the text: the time leads the line under each title.
+- **Map pins**: whoever and wherever the details panel holds stay pinned while
+  its tabs switch, so faces don't regroup and the camera stays.
+- **Your own character's panel** shows no How they feel, Recent, Model or
+  Context: you do their thinking.
+- **Add to home screen** (menu): the browser's install prompt where there is one
+  (`features/shell/install.ts`), Safari's Share steps on iPhone;
+  `app/manifest.ts`, `public/icon-192.png`, `public/icon-512.png`.
+- **Screenshot mode**: the reply box gives way to the selection bar; a whole row
+  picks its message; the frame reaches past the bubbles and starts at the
+  speaker's name when its first message opens a run; the dim is the frame's
+  shadow spread twice the transcript's height; a left-out message is soft
+  stripes in the line colour with a "Left out" chip. The preview has a close
+  button (`DialogPanel closable`).
+- **`data-selected:` matches the bare attribute** (ui-sdk writes
+  `data-selected=""`); `app/globals.css` redefines it over shadcn's `="true"`
+  one. Tailwind's formatter rewrites `data-[selected]:` back, so don't rely on
+  brackets for it.
+- **The event stream ends when the Gateway starts to stop**
+  (`messaging/http.ts`, `shutdownSignal`): OpenClaw counts every open HTTP
+  request as root work ("rootRequests") and drains until they end, so an open
+  `/kazusa/events` would hold a restart for its whole drain budget. The
+  browser's EventSource reconnects when the Gateway is back.
+- **Visitor note**: one install of a world can greet its visitors with its own
+  note (a title, text and a link):
+  `plugins.entries.kazusa.config.world.visitorNote` in that world's
+  `openclaw.json`, which is never in the world's repo, so the template and other
+  worlds made from it don't carry it. The plugin passes it through
+  `GET /kazusa/world` (`world.visitorNote`, `VisitorNoteSchema`; a malformed one
+  is dropped); `features/shell/visitor-welcome.tsx` leads with it.

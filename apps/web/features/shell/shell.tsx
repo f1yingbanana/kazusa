@@ -1,72 +1,37 @@
 "use client";
 
-import { parseAsString, useQueryState } from "nuqs";
-import { useEffect, useState, type ComponentType } from "react";
-import { useActiveView } from "@/hooks/use-active-view";
+import { useQueryState } from "nuqs";
+import { useEffect, useState } from "react";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { useSwitchResets } from "@/hooks/use-play";
 import { useSelection } from "@/hooks/use-selection";
 import { RealtimeProvider } from "@/lib/live/realtime-provider";
-import type { SectionSidebarProps } from "@/lib/registry/types";
+import { satisfies } from "@/lib/source/capabilities";
 import { SourcesProvider, useSources } from "@/lib/source/provider";
 import { syncPreferences } from "@/lib/state/preferences-store";
+import { requestInspector, setInspectorTab } from "@/lib/state/ui-store";
 import { Drawer, DrawerPanel } from "@/ui/drawer";
+import { cx } from "@/ui/cx";
 import { Segmented, SegmentedItem } from "@/ui/segmented";
-import { CharactersStage } from "../characters/characters-stage";
+import { PaneNavProvider, type PaneNav } from "@/ui/pane-nav";
+import { Toasts } from "@/ui/toast";
 import { PlayAsDialog } from "../characters/play-as-dialog";
-import { ChatList } from "../chats/chat-list";
-import { ChatsStage } from "../chats/chats-stage";
-import {
-  chatsParsers,
-  Stage,
-  StatusBar,
-  VisitorWelcome,
-  WorldUpdateNotice,
-} from "../legacy";
-import { SettingsSidebar } from "../settings/settings-sidebar";
-import { SettingsStage } from "../settings/settings-stage";
+import { chatsParsers } from "../chats/search-params";
 import { UpdateSaveDialog } from "../settings/update-save-dialog";
-import { TimelineSidebar } from "../timeline/timeline-sidebar";
-import { TimelineStage } from "../timeline/timeline-stage";
-import { WikiSidebar } from "../wiki/wiki-sidebar";
+import { Unavailable } from "../settings/unavailable";
 import { wikiParsers } from "../wiki/search-params";
-import { WikiStage } from "../wiki/wiki-stage";
-import { WhosWhere } from "../world/whos-where";
-import { WorldStage } from "../world/world-stage";
 import { CommandPalette } from "./command-palette";
 import { DetailsPanel } from "./details-panel";
+import { SavesDialog } from "./saves-dialog";
 import { SectionNav } from "./section-nav";
+import { useActiveSection } from "./sections";
+import { StatusBar } from "./status-bar";
 import { TopBar } from "./top-bar";
 import { useAppearance } from "./use-palette";
+import { slide } from "./slide";
 import { useDetailsSheet } from "./use-sheet";
-
-/** Sections rebuilt here; the rest still come from the registry's old views. */
-const SIDEBARS: Record<string, ComponentType<SectionSidebarProps> | null> = {
-  // The cast is the stage, and a profile is a page in it: no list beside them.
-  characters: null,
-  chats: ChatList,
-  settings: SettingsSidebar,
-  timeline: TimelineSidebar,
-  wiki: WikiSidebar,
-  world: WhosWhere,
-};
-
-const STAGES: Record<string, ComponentType> = {
-  characters: CharactersStage,
-  chats: ChatsStage,
-  settings: SettingsStage,
-  timeline: TimelineStage,
-  wiki: WikiStage,
-  world: WorldStage,
-};
-
-const PANE_LABELS: Record<string, [string, string]> = {
-  chats: ["Conversations", "Thread"],
-  settings: ["Categories", "Settings"],
-  timeline: ["People", "Timeline"],
-  wiki: ["Index", "Page"],
-  world: ["Who's where", "Map"],
-};
+import { VisitorWelcome } from "./visitor-welcome";
+import { WorldUpdateNotice } from "./world-update-notice";
 
 type Pane = "list" | "stage";
 
@@ -87,29 +52,66 @@ function Frame() {
   const [commandOpen, setCommandOpen] = useState(false);
   const [selection, select] = useSelection();
   const { player } = useSources();
-  const [, setView] = useQueryState("view", parseAsString);
   const [chatId] = useQueryState("chats.id", chatsParsers["chats.id"]);
   const [wikiPage] = useQueryState("wiki.page", wikiParsers["wiki.page"]);
   const [wikiTab] = useQueryState("wiki.tab", wikiParsers["wiki.tab"]);
-  const active = useActiveView();
+  const [settingsTab] = useQueryState("settings.tab");
+  const [talk] = useQueryState("world.talk");
+  const { resolved } = useSources();
+  const active = useActiveSection();
   const docked = useMediaQuery("(min-width: 1024px)");
   const wide = useMediaQuery("(min-width: 1280px)");
   const tablet = useMediaQuery("(min-width: 768px)");
-  const Sidebar = active.id in SIDEBARS ? SIDEBARS[active.id] : active.sidebar;
-  const OwnStage = STAGES[active.id];
-  const [pane, setPane] = useState<Pane>("stage");
+  const { Sidebar, Stage } = active;
+  // A talk opened or closed on World, narrow: its screen slides in, or the
+  // list does. Moves between list and stage slide by `slide` instead.
+  const [move, setMove] = useState<"forward" | "back" | null>(null);
+  const [listSheet, setListSheet] = useState(false);
   const [sheetOpen, setSheetOpen] = useDetailsSheet(selection, active.id);
 
-  // On a phone, a section opens on its list unless something in it is already open.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: only when the section changes
-  useEffect(() => {
+  const [prevTalk, setPrevTalk] = useState(talk);
+  if (prevTalk !== talk) {
+    setPrevTalk(talk);
+    if (Boolean(prevTalk) !== Boolean(talk)) setMove(talk ? "forward" : "back");
+  }
+  // What each section's stage shows, by the link: when it is the same on coming
+  // back, the section opens on the pane it was left on (Back to the index
+  // stays on the index); a different one (a link to a page) opens the stage.
+  const opened =
+    active.id === "chats"
+      ? (chatId ?? "")
+      : active.id === "wiki"
+        ? `${wikiPage ?? ""}|${wikiTab ?? ""}`
+        : active.id === "settings"
+          ? (settingsTab ?? "")
+          : "";
+  // Nothing open in it yet, a section starts on its list.
+  const fresh =
+    (active.id === "chats" && !chatId) ||
+    (active.id === "wiki" && !wikiPage && !wikiTab) ||
+    (active.id === "settings" && !settingsTab);
+  const [pane, setPane] = useState<Pane>(fresh ? "list" : "stage");
+  const [left, setLeft] = useState<
+    Readonly<Record<string, { pane: Pane; opened: string }>>
+  >({});
+  const [prevSection, setPrevSection] = useState(active.id);
+  const [prevOpened, setPrevOpened] = useState(opened);
+  if (prevSection === active.id && prevOpened !== opened) setPrevOpened(opened);
+  if (prevSection !== active.id) {
+    setLeft((was) => ({ ...was, [prevSection]: { pane, opened: prevOpened } }));
+    setPrevSection(active.id);
+    setPrevOpened(opened);
+    setMove(null);
+    setListSheet(false);
+    const remembered = left[active.id];
     setPane(
-      (active.id === "chats" && !chatId) ||
-        (active.id === "wiki" && !wikiPage && !wikiTab)
-        ? "list"
-        : "stage",
+      remembered && remembered.opened === opened
+        ? remembered.pane
+        : fresh
+          ? "list"
+          : "stage",
     );
-  }, [active.id]);
+  }
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -123,18 +125,44 @@ function Frame() {
   }, []);
 
   const split = Boolean(Sidebar) && !docked;
-  const showList = Boolean(Sidebar) && (docked || pane === "list");
-  const showStage = !split || pane === "stage";
-  const [listLabel, stageLabel] = PANE_LABELS[active.id] ?? [
-    "List",
-    active.label,
-  ];
+  const narrow = split ? (active.narrow ?? "pane") : null;
+  const shownPane: Pane =
+    narrow === "sheet" || (active.id === "world" && Boolean(talk))
+      ? "stage"
+      : pane;
+  const showList = Boolean(Sidebar) && (docked || shownPane === "list");
+  const showStage = !split || shownPane === "stage";
+  const [listLabel, stageLabel] = active.panes ?? ["List", active.label];
+  const paneNav: PaneNav =
+    narrow === "pane"
+      ? {
+          back: {
+            label: listLabel,
+            go: () => {
+              slide("back", () => {
+                setMove(null);
+                setPane("list");
+              });
+            },
+          },
+        }
+      : narrow === "sheet"
+        ? {
+            list: {
+              label: listLabel,
+              icon: active.listIcon ? (
+                <active.listIcon aria-hidden />
+              ) : undefined,
+              open: () => setListSheet(true),
+            },
+          }
+        : {};
   // Docked, You is always open beside the stage; in a drawer, only a pick opens it.
   const showDocked = wide && (Boolean(selection) || Boolean(player.id));
 
   return (
     <div
-      className="grid h-dvh grid-cols-[5.5rem_minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto] bg-ui-ground text-ui-ink max-md:grid-cols-[minmax(0,1fr)]"
+      className="grid h-dvh grid-cols-[4.5rem_minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto] bg-ui-ground text-ui-ink max-md:grid-cols-[minmax(0,1fr)]"
       onContextMenu={(event) => {
         if (event.defaultPrevented) return;
         const target = event.target as HTMLElement | null;
@@ -149,16 +177,22 @@ function Frame() {
       <TopBar
         className="col-span-full"
         onOpenCommand={() => setCommandOpen(true)}
-        onOpenSettings={() => void setView("settings")}
+        onOpenDetails={() => {
+          if (!player.id) return;
+          setInspectorTab("you");
+          void select({ kind: "character", id: player.id });
+          requestInspector();
+        }}
       />
       <SectionNav className="col-start-1 row-span-2 row-start-2 max-md:row-span-1 max-md:row-start-3" />
-      <div className="col-start-2 row-start-2 flex min-h-0 min-w-0 gap-4 pe-4 pb-3 max-lg:flex-col max-lg:gap-3 max-md:col-start-1 max-md:px-3 max-md:pb-2">
-        {split ? (
+      <div className="col-start-2 row-start-2 flex min-h-0 min-w-0 gap-4 pe-4 pb-3 max-lg:flex-col max-lg:gap-3 max-md:col-start-1 max-md:gap-2 max-md:overflow-x-clip max-md:p-0">
+        {narrow === "tabs" && !talk ? (
           <Segmented<Pane>
             aria-label={`${active.label} view`}
             stretch
             value={pane}
             onValueChange={(value) => value && setPane(value)}
+            className="max-md:mx-3 max-md:w-auto [&_button]:h-7"
           >
             <SegmentedItem value="list">{listLabel}</SegmentedItem>
             <SegmentedItem value="stage">{stageLabel}</SegmentedItem>
@@ -167,14 +201,39 @@ function Frame() {
         {showList && Sidebar ? (
           <aside
             aria-label={`${active.label} list`}
-            className="flex min-h-0 w-76 shrink-0 flex-col max-lg:w-auto max-lg:flex-1"
+            className={cx(
+              "flex min-h-0 w-76 shrink-0 flex-col max-lg:w-auto max-lg:flex-1 max-md:px-3",
+              split && "[view-transition-name:pane]",
+              split && move === "back" && "motion-safe:animate-ui-pane-back",
+            )}
           >
-            <Sidebar key={active.id} onNavigated={() => setPane("stage")} />
+            <Sidebar
+              key={active.id}
+              onNavigated={() =>
+                slide("forward", () => {
+                  setMove(null);
+                  setPane("stage");
+                })
+              }
+            />
           </aside>
         ) : null}
         {showStage ? (
-          <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[1.5rem] ui-raised *:min-h-0 *:flex-1">
-            {OwnStage ? <OwnStage /> : <Stage />}
+          <main
+            key={split && !docked ? `${active.id}-${shownPane}` : active.id}
+            className={cx(
+              "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[1.5rem] ui-raised *:min-h-0 *:flex-1 max-md:rounded-none max-md:shadow-none max-md:inset-ring-0",
+              !docked && "[view-transition-name:pane]",
+              split && move === "forward" && "motion-safe:animate-ui-pane-in",
+            )}
+          >
+            <PaneNavProvider value={paneNav}>
+              {satisfies(resolved, active.requires) ? (
+                <Stage />
+              ) : (
+                <Unavailable requires={active.requires} />
+              )}
+            </PaneNavProvider>
           </main>
         ) : null}
         {showDocked ? (
@@ -186,9 +245,26 @@ function Frame() {
           </aside>
         ) : null}
       </div>
-      <div className="col-start-2 row-start-3 *:border-0 *:bg-transparent max-md:hidden">
-        <StatusBar />
-      </div>
+      <StatusBar className="col-start-2 row-start-3 max-md:hidden" />
+
+      {narrow === "sheet" && Sidebar ? (
+        <Drawer
+          open={listSheet}
+          onOpenChange={setListSheet}
+          side={tablet ? "right" : "bottom"}
+          snapPoints={tablet ? undefined : [0.7, 1]}
+        >
+          <DrawerPanel
+            title={listLabel}
+            heading={tablet}
+            handle={tablet ? undefined : `Resize ${listLabel.toLowerCase()}`}
+          >
+            <div className="flex min-h-0 flex-col px-3 pt-3">
+              <Sidebar key={active.id} />
+            </div>
+          </DrawerPanel>
+        </Drawer>
+      ) : null}
 
       {wide ? null : (
         <Drawer
@@ -218,7 +294,9 @@ function Frame() {
       <WorldUpdateNotice />
       <UpdateSaveDialog />
       <PlayAsDialog />
+      <SavesDialog />
       <VisitorWelcome />
+      <Toasts />
     </div>
   );
 }

@@ -9,7 +9,7 @@ import type {
 } from "@kazusa/client";
 import { ChevronRightIcon, PlusIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/ui/toast";
 import { useStats } from "@/hooks/use-stats";
 import { catalogAdvice, statAdvice, type StatAdvice } from "@/lib/stats/advice";
 import {
@@ -517,7 +517,7 @@ export function StateSettings() {
     return (
       <SettingsPage
         title="States"
-        description="Track values on characters, relationships, and the world."
+        description="Values tracked on characters, relationships, and the world."
       >
         <Unavailable requires={["stats"]} title="States need a live Gateway" />
       </SettingsPage>
@@ -528,7 +528,7 @@ export function StateSettings() {
     return (
       <SettingsPage
         title="States"
-        description="Track values on characters, relationships, and the world."
+        description="Values tracked on characters, relationships, and the world."
       >
         {error ? (
           <Callout tone="danger" title="Couldn't load states">
@@ -554,7 +554,7 @@ export function StateSettings() {
       await saveCatalog(next, base);
       toast.success(
         done,
-        undo ? { action: { label: "Undo", onClick: undo } } : undefined,
+        undo ? { action: { label: "Undo", onAction: undo } } : undefined,
       );
       return true;
     } catch (cause) {
@@ -608,21 +608,23 @@ export function StateSettings() {
   return (
     <SettingsPage
       title="States"
-      description="Values the world tracks, like mood, warmth, money, or story chapter. Set a character's values in their details, or the world's beside the clock."
-      action={
-        canManage ? (
-          <Button
-            tone="primary"
-            size="sm"
-            icon={<PlusIcon aria-hidden />}
-            onClick={() => setEditing({ draft: EMPTY_DRAFT })}
-          >
-            New state
-          </Button>
-        ) : null
-      }
+      description="Values tracked on characters, relationships, and the world."
     >
-      <SettingsSection title="Tracked states">
+      <SettingsSection
+        title="Tracked states"
+        action={
+          canManage ? (
+            <Button
+              tone="primary"
+              size="sm"
+              icon={<PlusIcon aria-hidden />}
+              onClick={() => setEditing({ draft: EMPTY_DRAFT })}
+            >
+              New state
+            </Button>
+          ) : null
+        }
+      >
         {stale ? (
           <Callout
             title="States may be out of date"

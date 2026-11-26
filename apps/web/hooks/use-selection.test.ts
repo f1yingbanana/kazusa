@@ -9,9 +9,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { useSelection } from "./use-selection";
 import { entityRefParser } from "../lib/state/entity-ref";
 import { openChatPatch } from "../lib/source/chats/display";
-import { chatsParsers } from "../components/views/chats/search-params";
-import { timelineParsers } from "../components/views/timeline/search-params";
-import { wikiParsers } from "../components/views/wiki/search-params";
+import { chatsParsers } from "../features/chats/search-params";
+import { timelineParsers } from "../features/timeline/search-params";
+import { wikiParsers } from "../features/wiki/search-params";
 
 afterEach(cleanup);
 

@@ -8,7 +8,7 @@ import {
   Trash2Icon,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { toast } from "sonner";
+import { toast } from "@/ui/toast";
 import { toPictureName } from "@/lib/wiki/text";
 import { Button, buttonClass } from "@/ui/button";
 import { cx } from "@/ui/cx";

@@ -2,7 +2,7 @@
 
 import { ImagePlusIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/ui/toast";
 import { usePlaces } from "@/hooks/use-location";
 import { useWikiBackdrops, useWikiForm } from "@/hooks/use-wiki-editor";
 import {
@@ -342,7 +342,7 @@ export function BackdropPanel({
           <p
             role="status"
             className={cx(
-              "min-w-0 flex-1 truncate px-1 text-[0.8125rem] font-semibold text-ui-soft",
+              "min-w-0 flex-1 px-1 text-[0.8125rem] font-semibold text-ui-soft",
             )}
           >
             {dirty ? "Unsaved changes" : "No changes yet"}

@@ -33,7 +33,7 @@ import {
   type TypingStreamEvent,
 } from "@kazusa/client";
 import { unstable_serialize } from "swr/infinite";
-import { dispatchLive } from "@/lib/registry/live";
+import { dispatchLive } from "@/lib/live/dispatch";
 import { fetchTimeline } from "@/lib/source/timeline/http";
 import { mergeJournal, setStatuses } from "./state";
 import { applySceneEvent, silenceScenes } from "./scene-state";

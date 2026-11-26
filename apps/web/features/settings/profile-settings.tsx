@@ -2,12 +2,11 @@
 
 import type { ProfileResponse } from "@kazusa/client";
 import { useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/ui/toast";
 import { useAccess } from "@/hooks/use-access";
 import { useProfile } from "@/hooks/use-profile";
 import { Button } from "@/ui/button";
 import { TextareaField, TextField } from "@/ui/field";
-import { Fold, Folds } from "@/ui/fold";
 import { Note } from "@/ui/note";
 import { Callout, SettingsPage, SettingsSection } from "@/ui/settings";
 import { Unavailable } from "./unavailable";
@@ -94,20 +93,16 @@ function ProfileForm({ profile }: { profile: ProfileResponse }) {
         </Button>
       </div>
 
-      <Folds>
-        <Fold value="identity" title="World config identity">
-          <div className="flex flex-col gap-3 pt-1">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <TextField label="Display name" value={profile.name} readOnly />
-              <TextField label="User ID" value={profile.id} mono readOnly />
-            </div>
-            <p className="text-xs text-ui-soft">
-              Your name and ID come from this world&apos;s config and can&apos;t
-              be edited here.
-            </p>
-          </div>
-        </Fold>
-      </Folds>
+      <div className="flex flex-col gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <TextField label="Display name" value={profile.name} readOnly />
+          <TextField label="User ID" value={profile.id} mono readOnly />
+        </div>
+        <p className="text-xs text-ui-soft">
+          Your name and ID come from this world&apos;s config and can&apos;t be
+          edited here.
+        </p>
+      </div>
     </form>
   );
 }
@@ -118,7 +113,7 @@ export function ProfileSettings() {
   return (
     <SettingsPage
       title="Profile"
-      description="How the system agent knows you. You stay out of the world itself, whoever you play."
+      description="How the system agent knows you, outside the world."
     >
       {!enabled ? (
         <Unavailable

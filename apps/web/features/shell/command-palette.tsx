@@ -53,7 +53,8 @@ import { CharacterAvatar } from "../characters/character-avatar";
 import { charactersParsers, profilePatch } from "../characters/search-params";
 import { conversationParsers, conversationPatch } from "../chats/open";
 import { chatIcon } from "../entities/chat-meta";
-import { chatsParsers, PLACE_PREFIX, worldParsers } from "../legacy";
+import { chatsParsers } from "../chats/search-params";
+import { PLACE_PREFIX, worldParsers } from "../world/world-state";
 import { wikiParsers } from "../wiki/search-params";
 import { settingsParsers } from "../settings/search-params";
 import { useAllowedSettingsCategories } from "../settings/settings-sidebar";
@@ -151,7 +152,7 @@ export function CommandPalette({
       onOpenChange={onOpenChange}
       title="Search"
       label="Search people, places, chats and actions"
-      placeholder="A name, a place, a chat, or what you want to do…"
+      placeholder="Search anything"
       empty="Nothing by that name."
       query={query}
       onQueryChange={(next) => {

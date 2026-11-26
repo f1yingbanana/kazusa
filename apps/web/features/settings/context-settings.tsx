@@ -43,8 +43,9 @@ export function ContextSettings() {
   return (
     <SettingsPage
       title="Context"
-      description="How much characters remember and send each turn. Larger limits remember more and cost more."
-      action={
+      description="How much characters remember and send each turn."
+    >
+      <div className="-mt-5">
         <a
           href={CONTEXT_DOCS_URL}
           target="_blank"
@@ -54,8 +55,7 @@ export function ContextSettings() {
           How context works
           <ArrowUpRightIcon aria-hidden className="size-3.5" />
         </a>
-      }
-    >
+      </div>
       {!enabled ? (
         <Unavailable
           requires={["context"]}

@@ -1,7 +1,7 @@
 "use client";
 
 import { EyeIcon } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useAccess } from "@/hooks/use-access";
 import { useBrainTrace } from "@/hooks/use-brain";
 import { useCharacterStatus, useCharacters } from "@/hooks/use-characters";
@@ -53,6 +53,8 @@ export function Conversation({
     [trace, history.messages],
   );
   const alone = !chat.draft && chat.type === "group" && others.length === 0;
+  // Choosing a screenshot, nothing is sent: its bar takes the reply box's place.
+  const [shooting, setShooting] = useState(false);
 
   return (
     <section
@@ -81,8 +83,9 @@ export function Conversation({
         activity={activity}
         activityRunning={adminThinking}
         after={alone ? <ChatAlone chat={chat} canAdd={canPlay} /> : null}
+        onShooting={setShooting}
       />
-      <div className={cx("shrink-0", COMPOSER_DOCK)}>
+      <div className={cx("shrink-0", COMPOSER_DOCK, shooting && "hidden")}>
         <ChatFailure members={others} />
         <ReplyBox
           {...reply}

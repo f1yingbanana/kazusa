@@ -7,7 +7,6 @@ import { useCharacters } from "@/hooks/use-characters";
 import {
   applySceneEvent,
   useSceneBehind,
-  useSceneEchoes,
   useSceneLine,
 } from "@/lib/live/scene-state";
 import { isBeingSaid } from "@/lib/scene/director";
@@ -16,7 +15,6 @@ import { actionLine } from "@/lib/source/chats/display";
 import { useSources } from "@/lib/source/provider";
 import { COMPOSER_DOCK } from "@/ui/composer";
 import { cx } from "@/ui/cx";
-import { Echoes } from "./echoes";
 import { lineKey, useRevealed } from "@/hooks/use-said-text";
 import type { ReadingStatus } from "@/hooks/use-reading-mode";
 
@@ -40,12 +38,12 @@ export function useSpeakerName(): (line: SceneLine) => string {
 }
 
 /**
- * The bottom of the scene, in one centred column that shares a left edge: what
- * was just said as echoes, then a slim notice if one is given, then the panel,
- * holding exactly one line under a plate with its speaker's name (an action has
- * no plate and reads as narration) and, at its foot, the reply row or a
- * caption. The panel is never taller than half the scene: its line scrolls
- * inside it. The line is real text in a polite live region.
+ * The bottom of the scene, in one centred column that shares a left edge: a
+ * slim notice if one is given, then the panel, holding exactly one line under a
+ * plate with its speaker's name (an action has no plate and reads as narration)
+ * and, at its foot, the reply row or a caption. The panel is never taller than
+ * half the scene: its line scrolls inside it. The line is real text in a polite
+ * live region.
  */
 export function DialogueBox({
   chatId,
@@ -53,7 +51,6 @@ export function DialogueBox({
   notice,
   footer,
   reading,
-  onBacklog,
   morph,
 }: {
   chatId: string;
@@ -64,17 +61,14 @@ export function DialogueBox({
   /** The panel's last row: the reply box, or a read-only caption. */
   footer?: ReactNode;
   /**
-   * Reading mode: echoes stay until pushed out, and the panel's corner says
-   * what is happening (a caret when a line is ready).
+   * Reading mode: the panel's corner says what is happening (a caret when a
+   * line is ready).
    */
   reading?: ReadingStatus;
-  /** Opens the backlog: an echo is a way into it. */
-  onBacklog?: () => void;
   /** A view transition name for the panel, to morph into the reply box. */
   morph?: string;
 }) {
   const line = useSceneLine(chatId);
-  const echoes = useSceneEchoes(chatId);
   const behind = useSceneBehind(chatId);
   const nameOf = useSpeakerName();
   const plated = line !== undefined && line.kind === "speech";
@@ -98,13 +92,6 @@ export function DialogueBox({
       )}
     >
       <div className="mx-auto flex size-full max-w-3xl flex-col justify-end">
-        <Echoes
-          chatId={chatId}
-          echoes={echoes}
-          nameOf={nameOf}
-          fading={!reading}
-          onOpen={onBacklog}
-        />
         {/* Gone with nothing to say (the notice may render nothing). */}
         <div
           data-notice

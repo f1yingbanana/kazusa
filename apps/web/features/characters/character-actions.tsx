@@ -40,12 +40,9 @@ import {
   MenuSeparator,
   MenuTrigger,
 } from "@/ui/menu";
-import {
-  CharacterBrainSheet,
-  CharacterMemorySheet,
-  chatsParsers,
-  useStopBrain,
-} from "../legacy";
+import { BrainSheet } from "./brain-sheet";
+import { useStopBrain } from "./stop";
+import { chatsParsers } from "../chats/search-params";
 import { wikiParsers } from "../wiki/search-params";
 import { conversationParsers } from "../chats/open";
 import { timelineParsers, timelinePatch } from "../timeline/search-params";
@@ -79,7 +76,6 @@ export function CharacterActions({
   const { available: canObserve } = useObservedChat(null);
   const { chats } = useChats();
   const draft = useDraftChat();
-  const [memoryOpen, setMemoryOpen] = useState(false);
   const [brainOpen, setBrainOpen] = useState(false);
   const [cast, setCast] = useState<StageRequest | null>(null);
   const actionsRef = useRef<HTMLDivElement>(null);
@@ -128,6 +124,9 @@ export function CharacterActions({
   const together = standing !== undefined && standing === player.placeId;
   const canTalk = canMessage && together && !inTheirHuddle;
   const canGo = isAgent && there && !together && player.live && !yourself;
+  // Their memory is a tab of their profile: one place to read and edit it.
+  const openMemory = () =>
+    void setParams({ ...profilePatch(id), "wiki.part": "memory" });
   const showBrain =
     isAgent &&
     resolved.brain === "live" &&
@@ -237,7 +236,7 @@ export function CharacterActions({
               label="Memory"
               tone="soft"
               size="md"
-              onClick={() => setMemoryOpen(true)}
+              onClick={openMemory}
             >
               <NotebookPenIcon aria-hidden />
             </IconButton>
@@ -269,7 +268,7 @@ export function CharacterActions({
                   {memoryInMore ? (
                     <MenuItem
                       icon={<NotebookPenIcon aria-hidden />}
-                      onSelect={() => setMemoryOpen(true)}
+                      onSelect={openMemory}
                     >
                       Memory
                     </MenuItem>
@@ -341,16 +340,8 @@ export function CharacterActions({
         </DetailActionsEnd>
       </DetailActions>
 
-      {isAgent ? (
-        <CharacterMemorySheet
-          id={id}
-          name={character.name}
-          open={memoryOpen}
-          onOpenChange={setMemoryOpen}
-        />
-      ) : null}
       {showBrain ? (
-        <CharacterBrainSheet
+        <BrainSheet
           id={id}
           name={character.name}
           open={brainOpen}

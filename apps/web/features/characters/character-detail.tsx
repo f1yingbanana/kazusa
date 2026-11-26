@@ -4,17 +4,14 @@ import type { ComponentType } from "react";
 import { useAccess } from "@/hooks/use-access";
 import { useCharacters } from "@/hooks/use-characters";
 import { useRunsOnModel } from "@/hooks/use-models";
+import { useSources } from "@/lib/source/provider";
 import type { EntityRef } from "@/lib/state/entity-ref";
 import { Detail, DetailAbout, DetailHeader } from "@/ui/detail";
 import { Fold, Folds } from "@/ui/fold";
 import { Note } from "@/ui/note";
-import {
-  CharacterRecentSection,
-  CharacterRecentSummary,
-  CharacterStatesSection,
-  CharacterStatesSummary,
-  useWorldNow,
-} from "../legacy";
+import { CharacterRecentSection, CharacterRecentSummary } from "./recent";
+import { CharacterStatesSection, CharacterStatesSummary } from "./states";
+import { useWorldNow } from "../world/world-state";
 import { CharacterActions, FailureLine, StatusLine } from "./character-actions";
 import { CharacterAvatar } from "./character-avatar";
 import { Desires } from "./desires";
@@ -43,9 +40,12 @@ type FoldSpec = {
 export function CharacterFolds({
   id,
   recent = true,
+  yours = false,
 }: {
   id: string;
   recent?: boolean;
+  /** The one you play: you think for them, so no recent turns, model or context. */
+  yours?: boolean;
 }) {
   const { hasPermission } = useAccess();
   const runsOnModel = useRunsOnModel({ id });
@@ -57,7 +57,7 @@ export function CharacterFolds({
       Section: CharacterStatesSection,
       Summary: CharacterStatesSummary,
     },
-    ...(recent
+    ...(recent && !yours
       ? [
           {
             value: "recent",
@@ -67,7 +67,7 @@ export function CharacterFolds({
           },
         ]
       : []),
-    ...(hasPermission("manage") && runsOnModel
+    ...(hasPermission("manage") && runsOnModel && !yours
       ? [
           {
             value: "model",
@@ -115,6 +115,8 @@ export function CharacterDetail({
   const character = byId.get(id);
   const { status, presence } = usePresence({ id, kind: character?.kind });
   const { rooms } = useWorldNow();
+  const { player } = useSources();
+  const yours = id === player.id;
 
   if (!character)
     return <Note inset="panel">{`Nobody called "${id}" here.`}</Note>;
@@ -151,9 +153,9 @@ export function CharacterDetail({
 
       <RightNow character={character} company={company} />
 
-      {character.kind === "agent" ? <Desires id={id} /> : null}
+      {character.kind === "agent" && !yours ? <Desires id={id} /> : null}
 
-      <CharacterFolds id={id} />
+      <CharacterFolds id={id} yours={yours} />
     </Detail>
   );
 }

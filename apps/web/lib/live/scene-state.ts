@@ -109,7 +109,6 @@ export function silenceScenes(): void {
 }
 
 const NO_FIGURES: readonly Figure[] = [];
-const NO_LINES: readonly SceneLine[] = [];
 
 export function useSceneOpen(chatId: string): boolean {
   return useSceneStore((state) => chatId in state.scenes);
@@ -140,11 +139,6 @@ export function useSceneLit(chatId: string): string | undefined {
 /** The panel's line: the newest said, or one still being said. */
 export function useSceneLine(chatId: string): SceneLine | undefined {
   return useSceneStore((state) => state.scenes[chatId]?.line);
-}
-
-/** What was just said, above the panel: oldest first. */
-export function useSceneEchoes(chatId: string): readonly SceneLine[] {
-  return useSceneStore((state) => state.scenes[chatId]?.echoes ?? NO_LINES);
 }
 
 /** How many lines are waiting to be shown: "N behind". */

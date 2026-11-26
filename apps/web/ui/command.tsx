@@ -150,7 +150,7 @@ export function CommandDialog({
           <CommandEmpty className="text-center text-sm text-ui-soft data-empty:p-6">
             {empty}
           </CommandEmpty>
-          <CommandList className="max-h-[min(60vh,28rem)] overflow-y-auto p-2 empty:hidden">
+          <CommandList className="max-h-[min(60vh,28rem)] scroll-py-2 overflow-y-auto p-2 pb-3 empty:hidden">
             {children}
           </CommandList>
           {footer ? (

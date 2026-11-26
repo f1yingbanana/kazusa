@@ -102,9 +102,9 @@ export function ChroniclePhase({
     <div
       role="presentation"
       data-chronicle-phase=""
-      className="flex items-center gap-3 px-5 pt-4 pb-1.5 text-xs font-bold text-ui-soft max-md:px-3.5"
+      className="flex items-center gap-3 px-5 pt-4 pb-1.5 text-xs font-bold text-ui-soft max-md:gap-2 max-md:px-2.5"
     >
-      <span className="w-10 shrink-0" />
+      <span className="w-10 shrink-0 max-md:hidden" />
       <span className="grid w-6 shrink-0 place-items-center text-ui-soft [&_svg]:size-3.5">
         {icon}
       </span>
@@ -154,14 +154,14 @@ export function ChronicleEntry({
     <TimelineItem
       value={value}
       className={cx(
-        "group/item relative flex items-stretch gap-3 rounded-[1rem] px-5 py-0 outline-none focus-visible:inset-ring-2 focus-visible:inset-ring-ui-primary max-md:px-3.5",
+        "group/item relative flex items-stretch gap-3 rounded-[1rem] px-5 py-0 outline-none focus-visible:inset-ring-2 focus-visible:inset-ring-ui-primary max-md:gap-2 max-md:px-2.5",
         enter && "motion-safe:animate-ui-enter",
         className,
       )}
     >
       <TimelineTime
         dateTime={dateTime}
-        className="mt-3 flex h-6 w-10 shrink-0 items-center justify-end text-xs font-semibold text-ui-soft tabular-nums"
+        className="mt-3 flex h-6 w-10 shrink-0 items-center justify-end text-xs font-semibold text-ui-soft tabular-nums max-md:hidden"
       >
         {time}
       </TimelineTime>
@@ -190,22 +190,22 @@ export function ChronicleEntry({
           "flex min-w-0 flex-1 flex-col",
           card
             ? cx("my-1 gap-2 rounded-[1.25rem] px-4 py-2", CARD_SURFACE[tone])
-            : "gap-1.5 rounded-[0.875rem] px-2 py-3 transition-colors duration-150 hover:bg-ui-tint/45",
+            : "gap-1.5 rounded-[0.875rem] px-2 py-3 transition-colors duration-150 hover:bg-ui-tint/45 max-md:px-1.5",
         )}
       >
-        <div className="flex min-h-6 flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <div className="flex min-h-6 items-start justify-between gap-x-3 gap-y-1">
           <TimelineTitle
             className={cx(
-              "min-w-0 text-pretty text-ui-ink",
+              "min-w-0 flex-1 text-pretty text-ui-ink",
               card ? "text-[0.9375rem] leading-[1.45]" : "text-sm leading-snug",
             )}
           >
             {title}
           </TimelineTitle>
           {meta || trailing ? (
-            <div className="ms-auto flex shrink-0 items-center gap-2">
+            <div className="ms-auto flex max-w-[48%] min-w-0 shrink-0 items-center gap-2">
               {meta ? (
-                <span className="text-xs font-semibold text-ui-soft tabular-nums">
+                <span className="shrink-0 text-xs font-semibold whitespace-nowrap text-ui-soft tabular-nums max-md:hidden">
                   {meta}
                 </span>
               ) : null}
@@ -213,6 +213,17 @@ export function ChronicleEntry({
             </div>
           ) : null}
         </div>
+        {/* Narrow, the time column gives its room to the text: the time leads
+            the quiet line under the title instead, with the place and how long. */}
+        <span className="hidden flex-wrap items-center gap-x-1.5 text-xs font-semibold text-ui-soft tabular-nums max-md:flex">
+          {time}
+          {meta ? (
+            <>
+              <span aria-hidden>·</span>
+              {meta}
+            </>
+          ) : null}
+        </span>
         {description ? (
           <TimelineDescription className="flex flex-col gap-1.5">
             {description}
@@ -242,13 +253,13 @@ export function ChronicleMilestone({
     <TimelineItem
       value={value}
       className={cx(
-        "group/item relative flex items-stretch gap-3 rounded-[1rem] px-5 py-0 outline-none focus-visible:inset-ring-2 focus-visible:inset-ring-ui-primary max-md:px-3.5",
+        "group/item relative flex items-stretch gap-3 rounded-[1rem] px-5 py-0 outline-none focus-visible:inset-ring-2 focus-visible:inset-ring-ui-primary max-md:gap-2 max-md:px-2.5",
         enter && "motion-safe:animate-ui-enter",
       )}
     >
       <TimelineTime
         dateTime={dateTime}
-        className="mt-3 flex h-6 w-10 shrink-0 items-center justify-end text-xs font-semibold text-ui-soft tabular-nums"
+        className="mt-3 flex h-6 w-10 shrink-0 items-center justify-end text-xs font-semibold text-ui-soft tabular-nums max-md:hidden"
       >
         {time}
       </TimelineTime>
@@ -261,6 +272,7 @@ export function ChronicleMilestone({
       </div>
       <div className="flex min-w-0 flex-1 items-start px-2 pt-3 pb-2.5">
         <TimelineTitle className="inline-flex h-6 items-center gap-1.5 rounded-full bg-ui-tint px-3 text-xs font-bold text-ui-ink">
+          <span className="text-ui-soft tabular-nums md:hidden">{time}</span>
           {label}
         </TimelineTitle>
       </div>

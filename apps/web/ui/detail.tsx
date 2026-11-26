@@ -3,6 +3,7 @@
 import { XIcon } from "lucide-react";
 import type { ReactNode, Ref } from "react";
 import { IconButton } from "./button";
+import { ClampText } from "./clamp-text";
 import { cx } from "./cx";
 import { Picture } from "./picture";
 
@@ -141,9 +142,9 @@ export function DetailActionsEnd({ children }: { children: ReactNode }) {
 /** A short description, clamped to three lines. */
 export function DetailAbout({ children }: { children: ReactNode }) {
   return (
-    <p className="line-clamp-3 text-[0.8125rem] leading-[1.55] text-pretty text-ui-soft">
+    <ClampText className="text-[0.8125rem] leading-[1.55] text-pretty text-ui-soft">
       {children}
-    </p>
+    </ClampText>
   );
 }
 

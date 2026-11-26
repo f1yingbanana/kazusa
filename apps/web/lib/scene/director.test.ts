@@ -4,7 +4,6 @@ import {
   DWELL_MAX_MS,
   DWELL_MIN_MS,
   HISTORY_MESSAGES,
-  MAX_ECHOES,
   createScene,
   direct,
   drawableIds,
@@ -117,9 +116,9 @@ function lineup(state: SceneState): string[] {
 /** A line as "id:text", one being said as "id:~text", shown whole "~!". */
 const text = (line: SceneLine) =>
   `${line.speakerId}:${isBeingSaid(line) ? (line.whole ? "~!" : "~") : ""}${line.text}`;
-/** What shows: the echoes oldest first, then the panel's line. */
+/** What shows: the panel's line. */
 function shown(state: SceneState): string[] {
-  return [...state.echoes, ...(state.line ? [state.line] : [])].map(text);
+  return state.line ? [text(state.line)] : [];
 }
 /** Everything there is to read: what shows, then what waits. */
 const all = (state: SceneState): string[] => [
@@ -148,13 +147,9 @@ describe("opening a scene", () => {
     });
     expect(state.members).toEqual(["a", "b", "c"]);
     expect(state.placeId).toBe("cafe");
-    // The newest in the panel, the two before it as echoes.
-    expect(shown(state)).toEqual(["b:line 6", "a:line 7", "b:line 8"]);
-    expect(
-      [state.line, ...state.echoes].every(
-        (line) => line?.shownAt === undefined && line?.leftAt === undefined,
-      ),
-    ).toBe(true);
+    // The newest line in the panel, unpaced.
+    expect(shown(state)).toEqual(["b:line 8"]);
+    expect(state.line?.shownAt).toBeUndefined();
     // c is saying a line: shown, revealed from its window, as soon as the
     // scene is told the time.
     expect(nextShowAt(state)).toBe(0);
@@ -423,7 +418,7 @@ describe("who can be drawn", () => {
     expect(state.figures).toEqual([]);
     state = run(state, [speaking("a"), said(msg("p", "Hello."))]);
     expect(state.figures).toEqual([]);
-    expect(all(state)).toEqual(["b:Earlier.", "p:Hello."]);
+    expect(all(state)).toEqual(["p:Hello."]);
     state = direct(state, drawable("a", "b"));
     // The latest to have spoken first: a, speaking, in the middle; b beside.
     expect(cast(state)).toEqual({
@@ -542,16 +537,16 @@ describe("speakers", () => {
   });
 });
 
-describe("the panel and the echoes", () => {
-  it("shows the newest line in the panel, pushing the one it replaces up as an echo, two at most", () => {
+describe("the panel", () => {
+  it("shows the newest line in the panel", () => {
     const steps: [ChatMessage, string[]][] = [
       [msg("a", "one"), ["a:one"]],
-      [msg("b", "two"), ["a:one", "b:two"]],
-      [msg("a", "three"), ["a:one", "b:two", "a:three"]],
+      [msg("b", "two"), ["b:two"]],
+      [msg("a", "three"), ["a:three"]],
       // An action is a line like any other, its speaker's speech too.
-      [msg("a", "waves", { type: "action" }), ["b:two", "a:three", "a:waves"]],
-      [msg("c", "nods", { type: "action" }), ["a:three", "a:waves", "c:nods"]],
-      [msg("a", "four"), ["a:waves", "c:nods", "a:four"]],
+      [msg("a", "waves", { type: "action" }), ["a:waves"]],
+      [msg("c", "nods", { type: "action" }), ["c:nods"]],
+      [msg("a", "four"), ["a:four"]],
     ];
     let state = scene({ members: [PLAYER, "a", "b", "c"] });
     for (const [message, expected] of steps) {
@@ -560,12 +555,8 @@ describe("the panel and the echoes", () => {
       state = direct(state, said(message, at));
       expect(shown(state)).toEqual(expected);
       expect(state.line?.shownAt).toBe(at);
-      // The newest echo, if any, left the panel just now.
-      expect(state.echoes.at(-1)?.leftAt ?? at).toBe(at);
     }
-    expect(state.echoes).toHaveLength(MAX_ECHOES);
     expect(state.line?.kind).toBe("speech");
-    expect(state.echoes.map((l) => l.kind)).toEqual(["action", "action"]);
   });
 
   it("marks a line cut off mid-word, and ignores repeats and stickers", () => {
@@ -580,7 +571,6 @@ describe("the panel and the echoes", () => {
     });
     const next = direct(state, said(sticker));
     expect(next.line).toBe(state.line);
-    expect(next.echoes).toBe(state.echoes);
     expect(next.sequence).toBe(sticker.sequence);
   });
 
@@ -598,19 +588,18 @@ describe("the panel and the echoes", () => {
     expect(direct(state, { type: "advance", at: (due ?? 0) - 1 })).toBe(state);
     state = direct(state, { type: "advance", at: due ?? 0 });
     // One at a time: the next waits for this one in turn.
-    expect(shown(state)).toEqual(["a:short", "b:also short"]);
+    expect(shown(state)).toEqual(["b:also short"]);
     expect(state.line?.shownAt).toBe(due);
-    expect(state.echoes[0]?.leftAt).toBe(due);
     expect(nextShowAt(state)).toBe((due ?? 0) + DWELL_MIN_MS);
     // Later lines wait behind, in order; Jump to live shows them all.
     state = direct(state, said(msg("a", "then this"), 2_600));
     const jumped = direct(state, { type: "jump", at: 3_000 });
     expect(jumped.ahead).toEqual([]);
-    expect(shown(jumped)).toEqual(["b:also short", "b:smile", "a:then this"]);
+    expect(shown(jumped)).toEqual(["a:then this"]);
     expect(nextShowAt(jumped)).toBeUndefined();
     expect(direct(jumped, { type: "jump", at: 3_000 })).toBe(jumped);
     const next = direct(state, { type: "show-next", at: 3_000 });
-    expect(shown(next).at(-1)).toBe("b:smile");
+    expect(shown(next)).toEqual(["b:smile"]);
     expect(next.ahead.map(text)).toEqual(["a:then this"]);
     // Outside reading mode, asking with nothing waiting does nothing.
     expect(direct(jumped, { type: "show-next", at: 3_000 })).toBe(jumped);
@@ -625,7 +614,7 @@ describe("the panel and the echoes", () => {
     expect(state.ahead).toHaveLength(2);
     state = direct(state, said(msg(PLAYER, "Wait."), 1_003));
     expect(state.ahead).toEqual([]);
-    expect(shown(state)).toEqual(["a:two", "a:three", `${PLAYER}:Wait.`]);
+    expect(shown(state)).toEqual([`${PLAYER}:Wait.`]);
     expect(state.line?.shownAt).toBe(1_003);
   });
 
@@ -635,12 +624,12 @@ describe("the panel and the echoes", () => {
       messages: [msg("b", "Earlier.")],
     });
     state = direct(state, saying("a", "Here I am.", 1_000, 1_800, 100));
-    expect(shown(state)).toEqual(["b:Earlier.", "a:~Here I am."]);
+    expect(shown(state)).toEqual(["a:~Here I am."]);
     expect(state.line?.said).toEqual({ from: 1_000, until: 1_800 });
     expect(state.line?.speakerName).toBe("A");
     state = direct(state, said(msg("a", "Here I am."), 900));
-    // In its place, not pushed up again; when it appeared is kept.
-    expect(shown(state)).toEqual(["b:Earlier.", "a:Here I am."]);
+    // In its place; when it appeared is kept.
+    expect(shown(state)).toEqual(["a:Here I am."]);
     expect(state.line?.shownAt).toBe(100);
     expect(state.saying).toEqual({});
     expect(state.ahead).toEqual([]);
@@ -674,7 +663,7 @@ describe("the panel and the echoes", () => {
     expect(shown(state)).toEqual(["a:Before."]);
     expect(nextShowAt(state)).toBeUndefined();
     state = direct(state, said(msg("a", "Now."), 900));
-    expect(shown(state)).toEqual(["a:Before.", "a:Now."]);
+    expect(shown(state)).toEqual(["a:Now."]);
   });
 
   it("waits for the panel's line to have its time before showing a line being said", () => {
@@ -686,59 +675,34 @@ describe("the panel and the echoes", () => {
     expect(shown(state)).toEqual(["a:short"]);
     expect(nextShowAt(state)).toBe(2_500);
     state = direct(state, { type: "advance", at: 2_500 });
-    expect(shown(state)).toEqual(["a:short", "b:~Me next."]);
+    expect(shown(state)).toEqual(["b:~Me next."]);
     expect(nextShowAt(state)).toBeUndefined();
   });
 
-  it("gives the panel to the newest of two lines said at once; the other goes on in the echoes and commits there, cut", () => {
+  it("gives the panel to the newest of two lines said at once", () => {
     let state = scene({ members: [PLAYER, "a", "b"] });
     state = run(state, [
       saying("a", "I was going to say that we should", 0, 3_000, 0),
       saying("b", "Sorry, but no.", 400, 1_500, 400),
     ]);
-    // b cut in: b has the panel, a's line goes on above it.
-    expect(shown(state)).toEqual([
-      "a:~I was going to say that we should",
-      "b:~Sorry, but no.",
-    ]);
-    // a is cut: what was heard of it, in the echoes where it is.
-    state = direct(state, said(msg("a", "I was going to—"), 600));
-    expect(shown(state)).toEqual(["a:I was going to—", "b:~Sorry, but no."]);
-    expect(state.echoes[0]?.cutOff).toBe(true);
+    expect(shown(state)).toEqual(["b:~Sorry, but no."]);
     state = direct(state, said(msg("b", "Sorry, but no."), 1_600));
-    expect(shown(state)).toEqual(["a:I was going to—", "b:Sorry, but no."]);
+    expect(shown(state)).toEqual(["b:Sorry, but no."]);
   });
 
   it.each<[string, SceneEvent]>([
     ["the saying stops", speaking("b", false, 10_100)],
     ["the speaker leaves", members("a")],
     ["the stream drops", { type: "silence" }],
-  ])(
-    "takes a line being said away cleanly when %s, bringing back the line it pushed up",
-    (_, end) => {
-      const base = run(scene({ members: [PLAYER, "a", "b"] }), [
-        said(msg("a", "Said."), 0),
-        saying("b", "Never landed.", 10_000, 11_000, 10_000),
-      ]);
-      expect(shown(base)).toEqual(["a:Said.", "b:~Never landed."]);
-      const state = direct(base, end);
-      // No phantom line, no echo of it: the plate is a's again.
-      expect(shown(state)).toEqual(["a:Said."]);
-      expect(state.line?.leftAt).toBe(10_000);
-      expect(state.saying).toEqual({});
-      // And a message for it later shows as any line would.
-    },
-  );
-
-  it("takes a line being said in the echoes away too, when it never lands", () => {
-    let state = run(scene({ members: [PLAYER, "a", "b"] }), [
+  ])("takes a line being said away cleanly when %s", (_, end) => {
+    const base = run(scene({ members: [PLAYER, "a", "b"] }), [
       said(msg("a", "Said."), 0),
-      saying("a", "Then this", 10_000, 12_000, 10_000),
-      saying("b", "Over you", 10_500, 11_500, 10_500),
+      saying("b", "Never landed.", 10_000, 11_000, 10_000),
     ]);
-    expect(shown(state)).toEqual(["a:Said.", "a:~Then this", "b:~Over you"]);
-    state = direct(state, speaking("a", false, 10_600));
-    expect(shown(state)).toEqual(["a:Said.", "b:~Over you"]);
+    expect(shown(base)).toEqual(["b:~Never landed."]);
+    const state = direct(base, end);
+    expect(shown(state)).toEqual([]);
+    expect(state.saying).toEqual({});
   });
 
   it("holds a finished line behind a line being said until that lands and is read", () => {
@@ -754,14 +718,12 @@ describe("the panel and the echoes", () => {
     expect(nextShowAt(state)).toBe(0 + dwellMs({ text: "Hold on a second" }));
   });
 
-  it("shows the player's line at once over a line being said, which goes on above it and lands there", () => {
-    let state = run(scene({ members: [PLAYER, "a"] }), [
+  it("shows the player's line at once over a line being said", () => {
+    const state = run(scene({ members: [PLAYER, "a"] }), [
       saying("a", "Let me finish", 0, 2_000, 0),
       said(msg(PLAYER, "Stop."), 500),
     ]);
-    expect(shown(state)).toEqual(["a:~Let me finish", `${PLAYER}:Stop.`]);
-    state = direct(state, said(msg("a", "Let me—"), 700));
-    expect(shown(state)).toEqual(["a:Let me—", `${PLAYER}:Stop.`]);
+    expect(shown(state)).toEqual([`${PLAYER}:Stop.`]);
   });
 
   it("resumes a line being said after a reconnect from its window, not from the start", () => {
@@ -784,18 +746,6 @@ describe("the panel and the echoes", () => {
     expect(shown(again)).toEqual(shown(state));
   });
 
-  it("drops an echo once the renderer has faded it", () => {
-    const one = msg("a", "one");
-    let state = run(scene({ members: [PLAYER, "a"] }), [
-      said(one, 0),
-      said(msg("a", "two"), 100_000),
-    ]);
-    expect(shown(state)).toEqual(["a:one", "a:two"]);
-    state = direct(state, { type: "fade", messageId: one.id });
-    expect(shown(state)).toEqual(["a:two"]);
-    expect(direct(state, { type: "fade", messageId: one.id })).toBe(state);
-  });
-
   it("takes in only newer history, unpaced, and queues it behind lines still waiting", () => {
     const old = msg("a", "old");
     let state = scene({ members: [PLAYER, "a"], messages: [old] });
@@ -805,7 +755,7 @@ describe("the panel and the echoes", () => {
       msg("a", "missed two", { type: "action" }),
     ];
     state = direct(state, { type: "history", messages: [old, ...missed] });
-    expect(shown(state)).toEqual(["a:old", "a:missed one", "a:missed two"]);
+    expect(shown(state)).toEqual(["a:missed two"]);
     expect(state.line?.shownAt).toBeUndefined();
     // A live line already in does not come in twice from a later read.
     const live = msg("a", "live");
@@ -844,7 +794,7 @@ describe("reading mode", () => {
     expect(nextShowAt(state)).toBeUndefined();
     expect(direct(state, { type: "advance", at: 200_000 })).toBe(state);
     state = direct(state, next(200_000));
-    expect(shown(state)).toEqual(["a:Shown.", "b:One."]);
+    expect(shown(state)).toEqual(["b:One."]);
     expect(state.ahead.map(text)).toEqual(["a:Two."]);
     expect(state.wanted).toBe(false);
   });
@@ -862,18 +812,15 @@ describe("reading mode", () => {
     ]);
     state = direct(state, next(1_200));
     // Typed out from where its saying has got to, like a line that came live.
-    expect(shown(state)).toEqual([
-      "a:Shown.",
-      "b:~Long enough to be cut off later",
-    ]);
+    expect(shown(state)).toEqual(["b:~Long enough to be cut off later"]);
     // Someone cut in before it was said through: it shortens to what was
     // heard, in its place.
     const cut = direct(state, said(msg("b", "Long enough to—"), 2_000));
-    expect(shown(cut)).toEqual(["a:Shown.", "b:Long enough to—"]);
+    expect(shown(cut)).toEqual(["b:Long enough to—"]);
     expect(cut.line?.whole).toBeUndefined();
     // Never landed at all: it goes, like any line that never lands.
     const dropped = direct(state, speaking("b", false, 2_000));
-    expect(shown(dropped)).toEqual(["a:Shown."]);
+    expect(shown(dropped)).toEqual([]);
     // Still waiting when it never landed: nothing waits any more.
     const waiting = run(scene({ members: [PLAYER, "a", "b"] }), [
       reading(true),
@@ -931,7 +878,7 @@ describe("reading mode", () => {
       said(msg(PLAYER, "My answer.")),
     ]);
     // What waited shows first, then the reply; the reader has asked already.
-    expect(shown(state)).toEqual(["a:Unread.", `${PLAYER}:My answer.`]);
+    expect(shown(state)).toEqual([`${PLAYER}:My answer.`]);
     expect(state.wanted).toBe(true);
     state = direct(state, saying("a", "An answer.", 1_000, 2_000));
     expect(shown(state).at(-1)).toBe("a:~An answer.");
@@ -967,10 +914,10 @@ describe("reading mode", () => {
     // Asking again changes nothing: one pending request.
     expect(direct(state, next(600))).toBe(state);
     state = direct(state, saying("b", "Landing now.", 1_000, 2_000, 1_000));
-    expect(shown(state)).toEqual(["a:Shown.", "b:~Landing now."]);
+    expect(shown(state)).toEqual(["b:~Landing now."]);
     expect(state.wanted).toBe(false);
     state = direct(state, said(msg("b", "Landing now."), 2_000));
-    expect(shown(state)).toEqual(["a:Shown.", "b:Landing now."]);
+    expect(shown(state)).toEqual(["b:Landing now."]);
     // The next line waits again.
     state = direct(state, said(msg("a", "Held."), 3_100));
     expect(state.ahead.map(text)).toEqual(["a:Held."]);
@@ -985,7 +932,7 @@ describe("reading mode", () => {
     expect(state.wanted).toBe(true);
     expect(shown(state)).toEqual(["a:Shown."]);
     state = direct(state, said(msg("b", "nods.", { type: "action" }), 500));
-    expect(shown(state)).toEqual(["a:Shown.", "b:nods."]);
+    expect(shown(state)).toEqual(["b:nods."]);
     expect(state.wanted).toBe(false);
   });
 
@@ -1002,7 +949,7 @@ describe("reading mode", () => {
     expect(state.reading).toBe(false);
     expect(state.wanted).toBe(false);
     expect(state.ahead).toEqual([]);
-    expect(shown(state)).toEqual(["a:two", "a:three", "a:four"]);
+    expect(shown(state)).toEqual(["a:four"]);
     expect(state.line?.shownAt).toBe(50);
     expect(direct(state, reading(false))).toBe(state);
   });
@@ -1015,7 +962,7 @@ describe("reading mode", () => {
     ]);
     state = direct(state, said(msg(PLAYER, "Answer."), 2));
     expect(state.ahead).toEqual([]);
-    expect(shown(state)).toEqual(["a:one", "a:two", `${PLAYER}:Answer.`]);
+    expect(shown(state)).toEqual([`${PLAYER}:Answer.`]);
     expect(state.reading).toBe(true);
   });
 
@@ -1053,7 +1000,7 @@ describe("reading mode", () => {
     expect(state.ahead.map(text)).toEqual(["b:~Said over it"]);
     // The last one is typed out: the world runs again.
     state = direct(state, { type: "show-next", at: 0, sim: 1_100 });
-    expect(shown(state)).toEqual(["a:~!Said first", "b:~Said over it"]);
+    expect(shown(state)).toEqual(["b:~Said over it"]);
   });
 
   it("does not bring back someone who left while their line waited", () => {

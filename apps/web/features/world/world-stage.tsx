@@ -12,6 +12,7 @@ import {
 import { useAccess } from "@/hooks/use-access";
 import { useChatActions, useChats } from "@/hooks/use-chats";
 import { usePlaces, usePlayer } from "@/hooks/use-location";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { useSelfIn } from "@/hooks/use-self";
 import { setActiveChat } from "@/lib/live/realtime-state";
 import { useLiveStore } from "@/lib/live/state";
@@ -27,7 +28,7 @@ import {
   usePlacesAvailable,
   useWorldNow,
   worldParsers,
-} from "../legacy";
+} from "./world-state";
 import { WorldMap } from "./map/world-map";
 import { takeTalkOrigin } from "./talk-origin";
 import { OwnTalk, WatchedTalk } from "./talk-view";
@@ -54,6 +55,7 @@ export function WorldStage() {
     ? focus.slice(PLACE_PREFIX.length)
     : undefined;
   const talkId = params["world.talk"];
+  const phone = useMediaQuery("(max-width: 767px)");
   // A talk already open when World mounts (back from another tab, a reload, a
   // link) is simply there: only one opened while you watch widens out.
   const [openOnArrival, setOpenOnArrival] = useState(talkId);
@@ -75,10 +77,13 @@ export function WorldStage() {
   }
   const leaving = talk !== null && talk.id === leavingId;
   const shown = talk && !leaving ? talk.id : null;
-  const covered = shown !== null && coveredBy === shown;
+  const covered = shown !== null && (phone || coveredBy === shown);
   const close = () => void setParams({ "world.talk": null, "world.as": null });
   const back = () => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    if (
+      phone ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
       close();
       return;
     }
@@ -107,7 +112,7 @@ export function WorldStage() {
       {talk ? (
         <TalkLayer
           key={talk.id}
-          arrived={talk.id === openOnArrival}
+          arrived={phone || talk.id === openOnArrival}
           leaving={leaving}
           onEntered={() => setCoveredBy(talk.id)}
           onLeft={() => {

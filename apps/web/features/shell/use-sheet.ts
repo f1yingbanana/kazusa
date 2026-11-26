@@ -11,8 +11,9 @@ import {
 /**
  * Whether the details drawer is open where it isn't docked: it opens on a new
  * selection unless that was made quietly (opening a conversation points the
- * panel at it without covering it), opens when asked (Details), and closes when
- * the section changes, keeping the selection.
+ * panel at it without covering it, a tab inside the sheet keeps it open), opens
+ * when asked (Details), and closes when the section changes, keeping the
+ * selection.
  */
 export function useDetailsSheet(
   selection: EntityRef | null,
@@ -25,9 +26,10 @@ export function useDetailsSheet(
   const [seen, setSeen] = useState({ selKey, view });
   if (seen.selKey !== selKey || seen.view !== view) {
     setSeen({ selKey, view });
-    setOpen(
-      seen.selKey !== selKey ? Boolean(selKey) && selKey !== quietKey : false,
-    );
+    // A quiet pick (a tab inside the sheet, a conversation opened) leaves the
+    // sheet as it is; a loud one opens it; none, or another section, closes it.
+    if (!selKey || seen.view !== view) setOpen(false);
+    else if (selKey !== quietKey) setOpen(true);
   }
   useEffect(() => settleQuietSelection(selKey), [selKey]);
   useEffect(() => {

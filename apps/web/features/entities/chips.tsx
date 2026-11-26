@@ -5,6 +5,7 @@ import { useCharacter } from "@/hooks/use-characters";
 import { usePlace } from "@/hooks/use-location";
 import { useSelection } from "@/hooks/use-selection";
 import { firstName } from "@/lib/format";
+import { TextButton } from "@/ui/button";
 import { cx } from "@/ui/cx";
 import { CharacterAvatar } from "../characters/character-avatar";
 import { chatIcon, useChatTitle } from "./chat-meta";
@@ -34,8 +35,7 @@ export function CharacterChip({
   const label = short ? firstName(fullName) : fullName;
 
   return (
-    <button
-      type="button"
+    <TextButton
       title={short && label !== fullName ? fullName : undefined}
       className={cx(
         BASE,
@@ -57,7 +57,7 @@ export function CharacterChip({
         />
       ) : null}
       <span className="truncate">{label}</span>
-    </button>
+    </TextButton>
   );
 }
 
@@ -78,8 +78,7 @@ export function PlaceChip({
   const place = usePlace(id);
   const [, select] = useSelection();
   return (
-    <button
-      type="button"
+    <TextButton
       className={cx(
         BASE,
         variant === "pill"
@@ -94,7 +93,7 @@ export function PlaceChip({
         <MapPinIcon aria-hidden className="size-3.5 shrink-0 opacity-75" />
       )}
       <span className="truncate">{place?.name ?? id}</span>
-    </button>
+    </TextButton>
   );
 }
 
@@ -114,8 +113,7 @@ export function ChatChip({
   const [, select] = useSelection();
   const Icon = chatIcon(type);
   return (
-    <button
-      type="button"
+    <TextButton
       className={cx(
         BASE,
         variant === "pill"
@@ -127,6 +125,6 @@ export function ChatChip({
     >
       <Icon aria-hidden className="size-3.5 shrink-0 text-ui-soft" />
       <span className="truncate">{label ?? title}</span>
-    </button>
+    </TextButton>
   );
 }

@@ -53,6 +53,7 @@ export function ToolbarIconButton({
   return (
     <Tooltip label={label} shortcut={shortcut} side={tooltipSide} names>
       <Button
+        aria-label={label}
         {...props}
         className={cx(
           "grid size-9 place-items-center rounded-full text-ui-soft transition-[background-color,color,scale] duration-150 hover:bg-ui-tint hover:text-ui-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ui-primary active:scale-90 data-[disabled]:opacity-40 [&_svg]:size-4.5",

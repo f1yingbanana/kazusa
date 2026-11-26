@@ -14,7 +14,7 @@ import {
   updateLocation,
   useLiveStore,
 } from "./state";
-import { dispatchLive } from "../registry/live";
+import { dispatchLive } from "./dispatch";
 import { useCharacterStatus } from "../../hooks/use-characters";
 import { useLocationRecord } from "../../hooks/use-location";
 import { useDesireRecord } from "../../hooks/use-desires";

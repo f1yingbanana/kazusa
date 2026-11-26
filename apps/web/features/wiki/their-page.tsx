@@ -8,7 +8,7 @@ import type {
 } from "@kazusa/client";
 import { GlobeIcon, PencilIcon, PlusIcon } from "lucide-react";
 import { useQueryStates } from "nuqs";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useAccess } from "@/hooks/use-access";
 import { useCharacters } from "@/hooks/use-characters";
 import { usePageLookup, usePageName, useWikiPage } from "@/hooks/use-wiki";
@@ -203,20 +203,36 @@ export function TheirPage({ id, agent }: { id: string; agent: string }) {
   const about = firstName(title);
   const kind: WikiKind | undefined =
     params["wiki.kind"] ?? world?.kind ?? own?.kind;
-  const raw = params["wiki.raw"] === "1";
-  const editing: WikiSide | undefined = canManage
+  const paramRaw = params["wiki.raw"] === "1";
+  const paramEditing: WikiSide | undefined = canManage
     ? (params["wiki.edit"] ?? undefined)
+    : undefined;
+  const [pendingEdit, setPendingEdit] = useState<WikiSide | null | undefined>();
+  const [pendingRaw, setPendingRaw] = useState<boolean | null>(null);
+  if (
+    pendingEdit !== undefined &&
+    (pendingEdit ?? undefined) === paramEditing
+  ) {
+    setPendingEdit(undefined);
+  }
+  if (pendingRaw !== null && paramRaw === pendingRaw) setPendingRaw(null);
+  const raw = pendingRaw ?? paramRaw;
+  const editing: WikiSide | undefined = canManage
+    ? pendingEdit === undefined
+      ? paramEditing
+      : (pendingEdit ?? undefined)
     : undefined;
 
   const edit = (side: WikiSide | null, asRaw = false) =>
-    withTransition(
-      () =>
-        void setParams({
-          "wiki.edit": side,
-          "wiki.raw": side && asRaw ? "1" : null,
-          ...(side ? {} : { "wiki.kind": null, "wiki.name": null }),
-        }),
-    );
+    withTransition(() => {
+      setPendingEdit(side);
+      setPendingRaw(Boolean(side) && asRaw);
+      void setParams({
+        "wiki.edit": side,
+        "wiki.raw": side && asRaw ? "1" : null,
+        ...(side ? {} : { "wiki.kind": null, "wiki.name": null }),
+      });
+    });
   const done = (saved?: WikiSourceResponse) => {
     if (saved) void refresh();
     if (saved && saved.id !== id)
@@ -236,7 +252,10 @@ export function TheirPage({ id, agent }: { id: string; agent: string }) {
       raw={raw}
       compact
       onRaw={(on) =>
-        withTransition(() => void setParams({ "wiki.raw": on ? "1" : null }))
+        withTransition(() => {
+          setPendingRaw(on);
+          void setParams({ "wiki.raw": on ? "1" : null });
+        })
       }
       onDone={done}
     />
@@ -321,7 +340,7 @@ export function TheirPage({ id, agent }: { id: string; agent: string }) {
           ) : null}
         </>
       }
-      className="motion-safe:animate-ui-enter motion-safe:fill-mode-[both] motion-safe:[animation-delay:80ms]"
+      className="lg:motion-safe:animate-ui-enter lg:motion-safe:fill-mode-[both] lg:motion-safe:[animation-delay:80ms]"
     >
       {editing === "own" ? (
         editor("own")

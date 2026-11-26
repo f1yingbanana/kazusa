@@ -12,7 +12,7 @@ import type { ReactNode } from "react";
 import { cx } from "./cx";
 import { BACKDROP } from "./overlay";
 
-export { Drawer } from "@ui-sdk/react/drawer";
+export { Drawer, DrawerTrigger } from "@ui-sdk/react/drawer";
 
 const WIDTH = {
   md: "data-[side=right]:w-[min(24rem,calc(100vw-1.5rem))]",

@@ -3,7 +3,7 @@ import { chatSubject } from "@/lib/source/chats/display";
 import type { ChatInfo } from "@/lib/source/chats/types";
 import type { EntityRef } from "@/lib/state/entity-ref";
 import { entityRefParser } from "@/lib/state/entity-ref";
-import { chatsParsers } from "../legacy";
+import { chatsParsers } from "./search-params";
 
 /**
  * Where a conversation opens. Texts are your phone's: Chats. Talking face to

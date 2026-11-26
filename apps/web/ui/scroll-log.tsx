@@ -15,8 +15,11 @@ import { cx } from "./cx";
 
 export { createScrollAreaController } from "@ui-sdk/react/scroll-area";
 
-const FADE =
-  "pointer-events-none absolute inset-x-0 z-10 from-ui-surface to-transparent";
+/* Fade scrolled content with a mask so the card's outline and corners stay untouched. */
+const TOP_MASK =
+  "[--scroll-area-overflow-y-start:inherit] [mask-image:linear-gradient(to_bottom,transparent,black_min(1.5rem,var(--scroll-area-overflow-y-start)),black)]";
+const BOTH_MASK =
+  "[--scroll-area-overflow-y-start:inherit] [--scroll-area-overflow-y-end:inherit] [mask-image:linear-gradient(to_bottom,transparent,black_min(1.5rem,var(--scroll-area-overflow-y-start)),black_calc(100%-min(1.5rem,var(--scroll-area-overflow-y-end))),transparent)]";
 
 /**
  * A conversation's scroller: it opens at the newest line and keeps it in view
@@ -48,7 +51,10 @@ export function ScrollLog({
       <ScrollAreaViewport
         role="log"
         aria-label={label}
-        className="size-full min-h-0 flex-1 overscroll-contain outline-none focus-visible:inset-ring-2 focus-visible:inset-ring-ui-primary"
+        className={cx(
+          "size-full min-h-0 flex-1 overscroll-contain outline-none focus-visible:inset-ring-2 focus-visible:inset-ring-ui-primary",
+          TOP_MASK,
+        )}
       >
         <ScrollAreaContent
           className={cx("flex min-h-full flex-col", contentClassName)}
@@ -56,13 +62,6 @@ export function ScrollLog({
           {children}
         </ScrollAreaContent>
       </ScrollAreaViewport>
-      <div
-        aria-hidden="true"
-        className={cx(
-          FADE,
-          "top-0 h-[min(1.5rem,var(--scroll-area-overflow-y-start))] bg-linear-to-b [--scroll-area-overflow-y-start:inherit]",
-        )}
-      />
       <ScrollAreaScrollbar className="absolute inset-y-1 inset-e-0.5 z-20 flex w-2 touch-none opacity-0 transition-opacity duration-200 data-visible:opacity-100">
         <ScrollAreaThumb className="w-full rounded-full bg-[color-mix(in_oklch,var(--ui-soft),transparent_55%)]" />
       </ScrollAreaScrollbar>
@@ -116,7 +115,10 @@ export function ScrollFeed({
         role="region"
         aria-label={label}
         onScroll={onScroll}
-        className="size-full min-h-0 flex-1 overscroll-contain outline-none focus-visible:inset-ring-2 focus-visible:inset-ring-ui-primary"
+        className={cx(
+          "size-full min-h-0 flex-1 overscroll-contain outline-none focus-visible:inset-ring-2 focus-visible:inset-ring-ui-primary",
+          BOTH_MASK,
+        )}
       >
         <ScrollAreaContent
           className={cx("flex min-h-full flex-col", contentClassName)}
@@ -124,20 +126,6 @@ export function ScrollFeed({
           {children}
         </ScrollAreaContent>
       </ScrollAreaViewport>
-      <div
-        aria-hidden="true"
-        className={cx(
-          FADE,
-          "top-0 h-[min(1.5rem,var(--scroll-area-overflow-y-start))] bg-linear-to-b [--scroll-area-overflow-y-start:inherit]",
-        )}
-      />
-      <div
-        aria-hidden="true"
-        className={cx(
-          FADE,
-          "bottom-0 h-[min(1.5rem,var(--scroll-area-overflow-y-end))] bg-linear-to-t [--scroll-area-overflow-y-end:inherit]",
-        )}
-      />
       <ScrollAreaScrollbar className="absolute inset-y-1 inset-e-0.5 z-20 flex w-2 touch-none opacity-0 transition-opacity duration-200 data-visible:opacity-100">
         <ScrollAreaThumb className="w-full rounded-full bg-[color-mix(in_oklch,var(--ui-soft),transparent_55%)]" />
       </ScrollAreaScrollbar>

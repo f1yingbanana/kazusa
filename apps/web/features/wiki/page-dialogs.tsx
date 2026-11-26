@@ -2,7 +2,7 @@
 
 import type { WikiEditResult, WikiListItem } from "@kazusa/client";
 import { useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/ui/toast";
 import { useDeleteWikiPage, useSaveWikiPage } from "@/hooks/use-wiki";
 import { fetchWikiSource } from "@/lib/source/wiki/http";
 import { idProblem, pageId } from "@/lib/wiki/page-id";

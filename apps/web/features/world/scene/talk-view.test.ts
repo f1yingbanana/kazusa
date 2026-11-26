@@ -10,7 +10,7 @@ import {
   within,
 } from "@testing-library/react";
 import { withNuqsTestingAdapter } from "nuqs/adapters/testing";
-import { toast } from "sonner";
+import { toast } from "@/ui/toast";
 import { SWRConfig } from "swr";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
@@ -310,12 +310,15 @@ const lines = () =>
   [...screen.getByRole("log").querySelectorAll("[data-line]")].map(
     (line) => line.textContent,
   );
-/** The earlier lines above the panel, oldest first. */
-const echoes = () =>
-  [...document.querySelectorAll("[data-echo]")].map((echo) => echo.textContent);
 const plate = () => document.querySelector("[data-plate]")?.textContent;
 
 beforeEach(() => {
+  window.matchMedia ??= () =>
+    ({
+      matches: false,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }) as unknown as MediaQueryList;
   // What ui-sdk's popups and drawers need that jsdom lacks.
   HTMLElement.prototype.showPopover = function () {};
   HTMLElement.prototype.hidePopover = function () {};
@@ -491,6 +494,10 @@ describe("Scene or Transcript", () => {
 
     fireEvent.click(screen.getByRole("radio", { name: "Transcript" }));
     await waitFor(() => expect(scene()).toBeNull());
+    const reveal = document
+      .querySelector("[inert]")
+      ?.closest(".group\\/reveal");
+    expect(reveal?.className).toContain("grid-cols-[0fr]");
     expect(usePreferencesStore.getState().huddleRendering).toBe("list");
     expect(view.urls.at(-1)?.get("world.as")).toBe("list");
     expect(draft()).toBe("Half a thought");
@@ -625,7 +632,6 @@ describe("the scene", () => {
     // is lit as long as it is the panel's line.
     expect(lines()).toEqual(["Carol sets the bag down."]);
     expect(plate()).toBeUndefined();
-    expect(echoes()).toEqual(["AliceYou are late, again."]);
     expect(figure(container, "carol")?.dataset.lit).toBe("true");
     expect(figure(container, "alice")?.dataset.lit).toBe("false");
   });
@@ -1372,34 +1378,6 @@ describe("the dock", () => {
     );
   });
 
-  it("keeps two earlier lines above the panel, oldest on top, each under its own name, and lets one go once faded", async () => {
-    vi.mocked(fetchMessages).mockResolvedValue({
-      messages: [
-        message("alice", "First."),
-        message(PLAYER, "Second."),
-        message("bob", "waves.", "action"),
-        message("alice", "Fourth."),
-      ],
-      hasMore: false,
-    });
-    renderWith(chatView(huddle([PLAYER, "alice", "bob"])));
-    await waitFor(() => expect(lines()).toEqual(["Alice: Fourth."]));
-    // Oldest on top: drawn bottom up from the newest.
-    const rows = [...document.querySelectorAll<HTMLElement>("[data-echo]")];
-    expect(rows.map((row) => row.textContent)).toEqual([
-      "Bob waves.",
-      "Player NameSecond.",
-    ]);
-    expect(rows[0]?.parentElement?.className).toContain("flex-col-reverse");
-    // None between the plate and the line: outside the panel.
-    expect(rows.every((row) => !row.closest("[data-panel]"))).toBe(true);
-    expect(rows[1]?.className).toContain("opacity-75");
-    const older = rows[1]?.firstElementChild as HTMLElement;
-    expect(older.className).toContain("animate-ui-fade-out");
-    endAnimation(older);
-    expect(echoes()).toEqual(["Bob waves."]);
-  });
-
   it("says why nobody answers in one slim row above the panel", async () => {
     renderWith(chatView(huddle([PLAYER, "alice"])));
     await waitFor(() => expect(scene()).not.toBeNull());
@@ -1717,7 +1695,6 @@ describe("reading mode", () => {
     fireEvent.input(box, { target: { value: "My answer." } });
     await act(async () => fireEvent.keyDown(box, { key: "Enter" }));
     expect(lines()).toEqual(["Bob: Unread two."]);
-    expect(echoes()).toContain("AliceUnread one.");
     expect(speeds()).toEqual([0]);
     await act(async () => delivered());
     await waitFor(() => expect(speeds()).toEqual([0, SPEED]));
@@ -1784,33 +1761,6 @@ describe("reading mode", () => {
 describe("the backlog", () => {
   const backlog = () => screen.queryByRole("dialog", { name: "Transcript" });
 
-  it("opens from an echo at the latest line, and closes by its button or Escape", async () => {
-    vi.mocked(fetchMessages).mockResolvedValue({
-      messages: [message("alice", "Earlier."), message("alice", "Latest.")],
-      hasMore: false,
-    });
-    renderWith(chatView(huddle([PLAYER, "alice"])));
-    await waitFor(() => expect(lines()).toEqual(["Alice: Latest."]));
-    const echo = screen.getByRole("button", { name: /Earlier\./ });
-    fireEvent.click(echo);
-    const dialog = await waitFor(() => {
-      const open = backlog();
-      expect(open).not.toBeNull();
-      return open as HTMLElement;
-    });
-    expect(scene()?.contains(dialog)).toBe(false);
-    expect(within(dialog).getByText("Latest.")).toBeDefined();
-    fireEvent.click(screen.getByRole("button", { name: "Close transcript" }));
-    await waitFor(() => expect(backlog()).toBeNull());
-
-    fireEvent.click(echo);
-    await waitFor(() => expect(backlog()).not.toBeNull());
-    fireEvent.keyDown(document.activeElement ?? document.body, {
-      key: "Escape",
-    });
-    await waitFor(() => expect(backlog()).toBeNull());
-  });
-
   it("opens from full screen's cluster, and Escape then closes only it", async () => {
     const { container } = renderWith(chatView(huddle([PLAYER, "alice"])));
     await waitFor(() => expect(scene()).not.toBeNull());
@@ -1861,8 +1811,16 @@ describe("the backlog", () => {
         message: message("alice", "Waiting."),
       }),
     );
-    fireEvent.click(screen.getByRole("button", { name: /Earlier\./ }));
-    const dialog = backlog() as HTMLElement;
+    await act(async () =>
+      fireEvent.click(screen.getByRole("button", { name: "Full screen" })),
+    );
+    fireEvent.click(
+      within(screen.getByRole("toolbar", { name: "Scene" })).getByRole(
+        "button",
+        { name: backlogLabel },
+      ),
+    );
+    const dialog = await waitFor(() => backlog() as HTMLElement);
     fireEvent.click(within(dialog).getByText("Latest."));
     fireEvent.keyDown(within(dialog).getByText("Latest."), { key: " " });
     fireEvent.keyDown(document.body, { key: "ArrowRight" });
@@ -1884,9 +1842,9 @@ describe("the backlog", () => {
     await act(async () => fireEvent.keyDown(box, { key: "Enter" }));
     await waitFor(() => expect(failure).toHaveBeenCalledTimes(1));
     const action = failure.mock.calls[0]?.[1]?.action as
-      { label: string; onClick: () => void } | undefined;
+      { label: string; onAction: () => void } | undefined;
     expect(action?.label).toBe("Show");
-    act(() => action?.onClick());
+    act(() => action?.onAction());
     const dialog = backlog() as HTMLElement;
     expect(within(dialog).getByText("Count me in.")).toBeDefined();
     expect(within(dialog).getByRole("button", { name: /Retry/ })).toBeDefined();

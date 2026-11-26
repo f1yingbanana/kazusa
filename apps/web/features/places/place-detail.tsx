@@ -40,12 +40,12 @@ import {
   DetailPicture,
   DetailSection,
 } from "@/ui/detail";
-import { Fold, Folds } from "@/ui/fold";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "@/ui/menu";
 import { Note } from "@/ui/note";
 import { Tooltip } from "@/ui/tooltip";
 import { VisuallyHidden } from "@/ui/visually-hidden";
-import { PLACE_PREFIX, PlaceWaysSection, worldParsers } from "../legacy";
+import { PlaceWays } from "./place-ways";
+import { PLACE_PREFIX, worldParsers } from "../world/world-state";
 import { RichText } from "../wiki/links";
 import { wikiParsers } from "../wiki/search-params";
 import { CharacterAvatar } from "../characters/character-avatar";
@@ -94,7 +94,6 @@ export function PlaceDetail({
     (place.parent ? 1 : 0) +
     (places.children.get(place.id)?.length ?? 0) +
     connectionsOf(places, place.id).length;
-  const entity = { kind: "place" as const, id: place.id };
   const long = path.length > 2;
   const hiddenPath = path.slice(0, -1);
 
@@ -220,15 +219,9 @@ export function PlaceDetail({
 
       <PlacePeopleSections placeId={place.id} />
 
-      <Folds>
-        <Fold
-          value="ways"
-          title="Getting around"
-          summary={ways ? `${ways} ways` : "Nowhere"}
-        >
-          <PlaceWaysSection entity={entity} />
-        </Fold>
-      </Folds>
+      <DetailSection title="Getting around" meta={ways || undefined}>
+        <PlaceWays id={place.id} />
+      </DetailSection>
     </Detail>
   );
 }

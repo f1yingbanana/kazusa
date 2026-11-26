@@ -75,7 +75,7 @@ vi.mock("@/hooks/use-location", () => ({ usePlaces: () => null }));
 vi.mock("@/lib/source/wiki/editor", () => ({
   saveWikiForm: mocks.saveWikiForm,
 }));
-vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock("@/ui/toast", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 beforeAll(() => {
   globalThis.__UI_SDK_STRICT__ = true;

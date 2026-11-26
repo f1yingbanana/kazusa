@@ -10,7 +10,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { toast } from "sonner";
+import { toast } from "@/ui/toast";
 import { useSWRConfig } from "swr";
 import { useAccess } from "@/hooks/use-access";
 import { useCharacters } from "@/hooks/use-characters";
@@ -22,6 +22,7 @@ import {
   usePlayer,
 } from "@/hooks/use-location";
 import { useSelection } from "@/hooks/use-selection";
+import { useUiStore } from "@/lib/state/ui-store";
 import { useShowOnMapAsks } from "./show-on-map";
 import { useLiveStore } from "@/lib/live/state";
 import {
@@ -70,7 +71,7 @@ import {
   type CanvasViewport as Viewport,
 } from "@/ui/canvas";
 import { cx } from "@/ui/cx";
-import { worldParsers } from "../../legacy";
+import { worldParsers } from "../world-state";
 import {
   ArrangeBar,
   ArrangeButton,
@@ -235,6 +236,16 @@ export function WorldMap({
   const selectedPlace = selection?.kind === "place" ? selection.id : null;
   const selectedCharacter =
     selection?.kind === "character" ? selection.id : null;
+  // Whoever and wherever the details panel holds stay pinned while its tabs
+  // switch between them, so faces don't regroup and the camera stays put.
+  const openTabs = useUiStore((state) => state.inspectorTabs);
+  const onYou = useUiStore((state) => state.inspectorTab === "you");
+  const pickedCharacter =
+    (onYou ? openTabs.character : undefined) ??
+    selectedCharacter ??
+    openTabs.character ??
+    null;
+  const pinnedPlace = selectedPlace ?? openTabs.place ?? null;
 
   // Everyone drawn: the folder, plus the player wherever they are.
   const shownIds = useMemo(() => {
@@ -284,7 +295,7 @@ export function WorldMap({
   }, [occupied, geometry]);
 
   // Whoever is picked stands at their own place, whatever the room.
-  const pickedRecord = useLocationRecord(selectedCharacter ?? undefined);
+  const pickedRecord = useLocationRecord(pickedCharacter ?? undefined);
   const pickedPlace =
     pickedRecord && positionAt(pickedRecord, now).kind === "at"
       ? (positionAt(pickedRecord, now) as { placeId: string }).placeId
@@ -298,9 +309,9 @@ export function WorldMap({
         zoom: band,
         weight: (id) => peopleWithin.get(id) ?? 0,
         nameWidth,
-        pinned: [selectedPlace, pickedPlace].filter((id): id is string => !!id),
+        pinned: [pinnedPlace, pickedPlace].filter((id): id is string => !!id),
       }),
-    [geometry, band, peopleWithin, nameWidth, selectedPlace, pickedPlace],
+    [geometry, band, peopleWithin, nameWidth, pinnedPlace, pickedPlace],
   );
   const edges = useMemo(
     () => edgesAt(geometry, reveal, zoom),
@@ -572,19 +583,19 @@ export function WorldMap({
    */
   const shownPerson = useRef<string | null>(null);
   useEffect(() => {
-    if (!ready || selectedCharacter === shownPerson.current) return;
-    if (!selectedCharacter) {
+    if (!ready || pickedCharacter === shownPerson.current) return;
+    if (!pickedCharacter) {
       shownPerson.current = null;
       return;
     }
-    const record = locations.get(selectedCharacter);
+    const record = locations.get(pickedCharacter);
     const api = camera.current;
     if (!record || !api) return;
     const position = positionAt(record, now);
     const placeId = position.kind === "at" ? position.placeId : position.next;
     const on = planes.get(placeId);
     if (on === undefined) {
-      shownPerson.current = selectedCharacter;
+      shownPerson.current = pickedCharacter;
       return;
     }
     if (on !== plane) {
@@ -596,7 +607,7 @@ export function WorldMap({
         ? geometry.nodes.get(placeId)
         : travelerPoint(record, now, geometry);
     if (!point) return;
-    shownPerson.current = selectedCharacter;
+    shownPerson.current = pickedCharacter;
     const current = api.viewport.get().zoom;
     // Past where their place appears, so its name and faces have room.
     const needed =
@@ -624,7 +635,7 @@ export function WorldMap({
     }
   }, [
     ready,
-    selectedCharacter,
+    pickedCharacter,
     locations,
     now,
     planes,
@@ -873,8 +884,8 @@ export function WorldMap({
     })
     .sort(
       (a, b) =>
-        Number(b.person.id === selectedCharacter) -
-          Number(a.person.id === selectedCharacter) ||
+        Number(b.person.id === pickedCharacter) -
+          Number(a.person.id === pickedCharacter) ||
         rank(a.person) - rank(b.person),
     )
     .slice(0, MAX_TRAVELERS);
@@ -1035,11 +1046,11 @@ export function WorldMap({
       const node = geometry.nodes.get(placeId);
       if (!node || !shown(placeId) || !inView(node)) continue;
       // Someone picked always has a face here, room or not.
-      const picked = people.some((person) => person.id === selectedCharacter);
+      const picked = people.some((person) => person.id === pickedCharacter);
       const fits = Math.max(plan.avatars.get(placeId) ?? 0, picked ? 1 : 0);
       // A count of one ("1", "+1") says less than the face it hides.
       const room = people.length === fits + 1 ? fits + 1 : fits;
-      const seated = facesShown(people, room, selectedCharacter);
+      const seated = facesShown(people, room, pickedCharacter);
       const extra = people.length - seated.length;
       const slots = seated.length + (extra > 0 ? 1 : 0);
       const step = reaching === placeId ? 31 : 15;
@@ -1070,7 +1081,7 @@ export function WorldMap({
       }
     }
     return { faces, counts };
-  }, [clusters, geometry, shown, inView, plan, selectedCharacter, reaching]);
+  }, [clusters, geometry, shown, inView, plan, pickedCharacter, reaching]);
 
   // Whoever's face is under the pointer, wherever it's drawn.
   const personPeek = (() => {

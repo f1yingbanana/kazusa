@@ -132,19 +132,16 @@ export function LookingAt({ trail }: { trail: readonly string[] }) {
       )}
     >
       {above.length > 0 ? (
-        <span
-          key={above.join("\n")}
-          className="min-w-0 truncate text-ui-soft motion-safe:animate-ui-enter"
-        >
-          {above.join(" › ")} ›
-        </span>
+        <>
+          <span className="min-w-0 truncate text-ui-soft">
+            {above.join(" › ")}
+          </span>
+          <span aria-hidden className="shrink-0 text-ui-soft">
+            ›
+          </span>
+        </>
       ) : null}
-      <span
-        key={here}
-        className="shrink-0 text-ui-ink motion-safe:animate-ui-enter"
-      >
-        {here}
-      </span>
+      <span className="shrink-0 text-ui-ink">{here}</span>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import {
   ClockActionPayloadSchema,
+  VisitorNoteSchema,
   type Capability,
   type ClockResponse,
   type ClockState,
@@ -18,6 +19,22 @@ import {
 } from "../http/helpers.ts";
 import { operatorOf } from "../identity.ts";
 import type { Player } from "../player.ts";
+import { z } from "zod";
+
+const WorldConfigSchema = z.object({
+  title: z.string().optional(),
+  summary: z.string().optional(),
+  accent: z.string().optional(),
+  visitorNote: VisitorNoteSchema.optional().catch(undefined),
+});
+
+/** How `config.world` names the world; a malformed note is left out, not fatal. */
+export function worldConfigOf(
+  config: unknown,
+): z.infer<typeof WorldConfigSchema> {
+  const parsed = WorldConfigSchema.safeParse(config ?? {});
+  return parsed.success ? parsed.data : {};
+}
 
 /** Domains every Kazusa world serves; others depend on the world's data. */
 export const DEFAULT_CAPABILITIES: Readonly<
@@ -68,17 +85,14 @@ export function registerClockHttp(
   route("world", "GET", async (_req, res, role) => {
     await clock.init();
     const clockState = toClockState(clock);
+    const named = worldConfigOf(api.pluginConfig?.world);
     const worldMeta: WorldMeta = options?.getWorldMeta
       ? await options.getWorldMeta()
       : {
-          title:
-            (api.pluginConfig?.world as { title?: string } | undefined)
-              ?.title ?? "Kivotos",
-          summary:
-            (api.pluginConfig?.world as { summary?: string } | undefined)
-              ?.summary ?? "Kazusa multi-agent roleplay society",
-          accent: (api.pluginConfig?.world as { accent?: string } | undefined)
-            ?.accent,
+          title: named.title ?? "Kivotos",
+          summary: named.summary ?? "Kazusa multi-agent roleplay society",
+          accent: named.accent,
+          visitorNote: named.visitorNote,
           // Read on each request, so editing the file needs no restart.
           package: worldCredit(options?.worldDir ?? process.cwd()),
           update: availableUpdate(options?.worldDir ?? process.cwd()),

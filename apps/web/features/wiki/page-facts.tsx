@@ -25,7 +25,7 @@ import { Infobox, InfoboxRow } from "@/ui/infobox";
 import { CharacterAvatar } from "../characters/character-avatar";
 import { useProfilePicture } from "../characters/profile-header";
 import { timelineParsers, timelinePatch } from "../timeline/search-params";
-import { PLACE_PREFIX, worldParsers } from "../legacy";
+import { PLACE_PREFIX, worldParsers } from "../world/world-state";
 import { askToShowOnMap } from "../world/map/show-on-map";
 import { RichText, WikiLink } from "./links";
 import { wikiPatch } from "./open";

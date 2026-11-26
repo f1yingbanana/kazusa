@@ -3,12 +3,14 @@
 import type { WikiKind } from "@kazusa/client";
 import {
   CopyIcon,
+  PencilIcon,
+  StarIcon,
   EllipsisIcon,
   MapPinPlusIcon,
   Trash2Icon,
 } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/ui/toast";
 import { useAccess } from "@/hooks/use-access";
 import { fetchWikiSource } from "@/lib/source/wiki/http";
 import { IconButton } from "@/ui/button";
@@ -58,6 +60,8 @@ export function PageMenu({
   kind,
   place = false,
   onNewInside,
+  onEdit,
+  favorite,
   onDeleted,
 }: {
   id: string;
@@ -68,6 +72,10 @@ export function PageMenu({
   place?: boolean;
   /** For a place: make another inside it. */
   onNewInside?: (() => void) | undefined;
+  /** Edit, folded in here where the header has no room for its button. */
+  onEdit?: (() => void) | undefined;
+  /** A character's page: star them, here where the header has no room. */
+  favorite?: { readonly on: boolean; readonly toggle: () => void } | undefined;
   onDeleted: () => void;
 }) {
   const { canManage } = useAccess();
@@ -83,6 +91,21 @@ export function PageMenu({
           <EllipsisIcon aria-hidden />
         </MenuTrigger>
         <MenuContent align="end">
+          {favorite ? (
+            <MenuItem
+              icon={
+                <StarIcon aria-hidden data-on={favorite.on ? "" : undefined} />
+              }
+              onClick={favorite.toggle}
+            >
+              {favorite.on ? "Unfavorite" : "Favorite"}
+            </MenuItem>
+          ) : null}
+          {canManage && onEdit ? (
+            <MenuItem icon={<PencilIcon aria-hidden />} onClick={onEdit}>
+              Edit
+            </MenuItem>
+          ) : null}
           {canManage && onNewInside ? (
             <MenuItem
               icon={<MapPinPlusIcon aria-hidden />}

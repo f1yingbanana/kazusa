@@ -13,10 +13,11 @@ import {
   UserCogIcon,
   UsersRoundIcon,
 } from "lucide-react";
-import { Fragment, memo, useState, type ReactNode } from "react";
+import { Fragment, memo, type ReactNode } from "react";
 import { useCharacters } from "@/hooks/use-characters";
 import { useSources } from "@/lib/source/provider";
 import { taskIcon, taskLabel } from "@/lib/state/task-icon";
+import { TaskChip } from "../entities/task-chip";
 import {
   formatSimDuration,
   formatSimTime,
@@ -24,6 +25,7 @@ import {
   MINUTE,
 } from "@/lib/time/sim";
 import { AvatarStack } from "@/ui/avatar";
+import { ClampText } from "@/ui/clamp-text";
 import {
   ChronicleEntry,
   ChronicleMilestone,
@@ -78,32 +80,12 @@ function ActorList({
   );
 }
 
-/** Clamps a longer description to one clean line and unfolds it in place on click. */
-function FoldableNote({ text }: { text: string }) {
-  const [expanded, setExpanded] = useState(false);
-  if (text.length <= 72) {
-    return (
-      <p className="text-[0.8125rem] leading-normal text-pretty text-ui-soft">
-        {text}
-      </p>
-    );
-  }
-  return (
-    <button
-      type="button"
-      aria-expanded={expanded}
-      onClick={() => setExpanded((open) => !open)}
-      className="w-full rounded-[0.5rem] text-start text-[0.8125rem] leading-normal text-pretty text-ui-soft transition-colors duration-150 hover:text-ui-ink focus-visible:outline-2 focus-visible:outline-ui-primary"
-    >
-      <span className={expanded ? undefined : "line-clamp-1"}>{text}</span>
-    </button>
-  );
-}
+const NOTE_CLASS = "text-[0.8125rem] leading-normal text-pretty text-ui-soft";
 
 /**
- * Formats a `message.sent` preview cleanly: detects `*action*` lines for italics
- * without literal asterisks, and trims backend 100-char mid-word cuts at a word
- * boundary with an ellipsis.
+ * Formats a `message.sent` preview cleanly: detects `*action*` lines for
+ * italics without literal asterisks, and trims backend 100-char mid-word cuts
+ * at a word boundary with an ellipsis.
  */
 function formatMessagePreview(raw: string): {
   readonly text: string;
@@ -111,7 +93,9 @@ function formatMessagePreview(raw: string): {
 } {
   const trimmed = raw.trim();
   const isAction = trimmed.startsWith("*");
-  let text = isAction ? trimmed.replace(/^\*+/, "").replace(/\*+$/, "").trim() : trimmed;
+  let text = isAction
+    ? trimmed.replace(/^\*+/, "").replace(/\*+$/, "").trim()
+    : trimmed;
   if (raw.length >= 100 && !/[.!?…]$/.test(text)) {
     const clean = text.replace(/[,;:\s]+\S*$/, "");
     text = `${clean || text}…`;
@@ -144,8 +128,11 @@ function WhoseList({ senders }: { senders: readonly string[] }) {
 
 function AttentionSummary({
   payload,
+  actor,
 }: {
   payload: Extract<JournalEvent, { kind: "attention.decided" }>["payload"];
+  /** Whose attention: their activity's chip opens their Timeline. */
+  actor: string | undefined;
 }) {
   const { outcome, lines, tunedOut } = payload;
   const activity =
@@ -184,13 +171,21 @@ function AttentionSummary({
             <ChatChip id={lines[0].chatId} />
           </>
         ) : null}
-        {outcome === "ignored"
-          ? inPerson
-            ? ""
-            : " unread"
-          : activity
-            ? ` aside until ${taskLabel(activity.type).toLowerCase()} ends (${formatSimTime(activity.endAt)})`
-            : " aside for later"}
+        {outcome === "ignored" ? (
+          inPerson ? (
+            ""
+          ) : (
+            " unread"
+          )
+        ) : activity ? (
+          <>
+            {" aside until "}
+            <TaskChip type={activity.type} actor={actor} />
+            {` ends (${formatSimTime(activity.endAt)})`}
+          </>
+        ) : (
+          " aside for later"
+        )}
       </>
     ) : null;
 
@@ -204,7 +199,10 @@ function AttentionSummary({
         </>
       ) : null}
       {activity ? (
-        <span className="text-ui-soft">{` · while ${taskLabel(activity.type).toLowerCase()}`}</span>
+        <span className="text-ui-soft">
+          {" · while "}
+          <TaskChip type={activity.type} actor={actor} />
+        </span>
       ) : null}
     </>
   );
@@ -271,14 +269,10 @@ export const EventRow = memo(function EventRow({
         unknown,
         monologue,
       } = event.payload;
-      const verb = taskLabel(type);
       title = (
         <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
           <ActorList actors={actors} />
-          <span className="inline-flex items-center gap-1 font-semibold text-ui-soft">
-            <Icon aria-hidden className="size-3.5 shrink-0" />
-            <span>{verb}</span>
-          </span>
+          <TaskChip type={type} actor={actors[0]} capital />
           {spot ? <span className="text-ui-soft">{`(${spot})`}</span> : null}
           {unknown ? (
             <span className="text-ui-soft">{`toward ${unknown}`}</span>
@@ -310,7 +304,11 @@ export const EventRow = memo(function EventRow({
       if (taskDesc || monologue) {
         description = (
           <>
-            {taskDesc ? <FoldableNote text={taskDesc} /> : null}
+            {taskDesc ? (
+              <ClampText lines={1} className={NOTE_CLASS}>
+                {taskDesc}
+              </ClampText>
+            ) : null}
             {monologue ? (
               <ChronicleThought>{monologue}</ChronicleThought>
             ) : null}
@@ -343,11 +341,16 @@ export const EventRow = memo(function EventRow({
       title = (
         <span className="inline-flex flex-wrap items-center gap-x-1 gap-y-0.5">
           <ActorList actors={actors} />
-          <span className="text-ui-soft">{`stopped ${taskLabel(event.payload.type).toLowerCase()}`}</span>
+          <span className="text-ui-soft">stopped</span>
+          <TaskChip type={event.payload.type} actor={actors[0]} />
         </span>
       );
       if (event.payload.description) {
-        description = <FoldableNote text={event.payload.description} />;
+        description = (
+          <ClampText lines={1} className={NOTE_CLASS}>
+            {event.payload.description}
+          </ClampText>
+        );
       }
       break;
     }
@@ -368,7 +371,9 @@ export const EventRow = memo(function EventRow({
           {text}
         </p>
       ) : (
-        <FoldableNote text={text} />
+        <ClampText lines={1} className={NOTE_CLASS}>
+          {text}
+        </ClampText>
       );
       if (event.chatId) {
         trailing = (
@@ -471,12 +476,14 @@ export const EventRow = memo(function EventRow({
       title = (
         <span className="inline-flex flex-wrap items-center gap-x-1 gap-y-0.5">
           <ActorList actors={actors} />
-          <AttentionSummary payload={event.payload} />
+          <AttentionSummary payload={event.payload} actor={actors[0]} />
         </span>
       );
       if (event.payload.lines.length === 1) {
         description = (
-          <FoldableNote text={`“${event.payload.lines[0].excerpt}”`} />
+          <ClampText lines={1} className={NOTE_CLASS}>
+            {`“${event.payload.lines[0].excerpt}”`}
+          </ClampText>
         );
       } else if (event.payload.lines.length > 1) {
         description = (
@@ -511,8 +518,16 @@ export const EventRow = memo(function EventRow({
       icon = <EyeIcon aria-hidden />;
       tone = "accent";
       variant = "card";
-      const { subjects, placeId, moment, between, huddle, word, probability, roll } =
-        event.payload;
+      const {
+        subjects,
+        placeId,
+        moment,
+        between,
+        huddle,
+        word,
+        probability,
+        roll,
+      } = event.payload;
       title = (
         <span className="inline-flex flex-wrap items-center gap-x-1 gap-y-0.5">
           <ActorList actors={actors} />

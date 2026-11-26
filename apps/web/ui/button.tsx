@@ -166,3 +166,14 @@ export function IconButton({
     </Tooltip>
   );
 }
+
+/**
+ * A press that reads as words in a line, like a name in "You are Sensei": no
+ * box of its own, so `className` draws it.
+ */
+export function TextButton({
+  className,
+  ...props
+}: Omit<ComponentProps<typeof Base>, "className"> & { className?: string }) {
+  return <Base {...props} className={className} />;
+}

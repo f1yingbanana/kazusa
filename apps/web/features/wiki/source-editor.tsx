@@ -3,7 +3,7 @@
 import type { WikiKind, WikiSourceResponse } from "@kazusa/client";
 import { FileTextIcon } from "lucide-react";
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/ui/toast";
 import { useSaveWikiPage, useWikiList, useWikiSource } from "@/hooks/use-wiki";
 import { WikiConflictError } from "@/lib/source/wiki/http";
 import { Button } from "@/ui/button";

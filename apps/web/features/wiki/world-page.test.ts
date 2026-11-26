@@ -357,7 +357,12 @@ beforeAll(() => {
     unobserve() {}
     disconnect() {}
   };
-  window.matchMedia ??= () => ({ matches: false }) as MediaQueryList;
+  window.matchMedia = () =>
+    ({
+      matches: true,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }) as unknown as MediaQueryList;
 });
 
 beforeEach(() => {
@@ -657,7 +662,7 @@ describe("WorldPage tabs", () => {
     expect(await screen.findByText("Keep order.")).toBeTruthy();
   });
 
-  it("shows People tab with cast notes and Who knows for places and concepts", async () => {
+  it("shows Characters tab with cast notes and Who knows for places and concepts", async () => {
     mocks.characters = [
       {
         id: "hina",
@@ -708,10 +713,10 @@ describe("WorldPage tabs", () => {
     render(createElement(WorldPage, { id: "prefect_hq" }));
 
     const tabs = screen.getAllByRole("tab").map((tab) => tab.textContent);
-    expect(tabs).toEqual(["Page", "People", "Backdrop"]);
+    expect(tabs).toEqual(["Page", "Characters", "Backdrop"]);
 
     const res = await agent.act({
-      steps: [{ ref: "People", action: "press" }],
+      steps: [{ ref: "Characters", action: "press" }],
     });
     expect(res.error?.message ?? "ok").toBe("ok");
     const notesSection = screen.getByLabelText("What people think");
@@ -752,5 +757,24 @@ describe("WorldPage tabs", () => {
     expect(screen.getByText("Leads the Prefect Team.")).toBeTruthy();
     expect(screen.getByText('link to unknown page "ghost"')).toBeTruthy();
     expect(screen.queryByText("unrelated warning")).toBeNull();
+  });
+
+  it("orders the infobox before the article on narrow viewports", () => {
+    mocks.pageData = {
+      id: "hina",
+      kind: "person",
+      name: "Hina",
+      aliases: [],
+      summary: "Head Prefect.",
+      lead: "Leads the Prefect Team.",
+      sections: [],
+      notes: [],
+      history: [],
+      openThreads: [],
+    };
+    render(createElement(WorldPage, { id: "hina" }));
+    const infobox = screen.getByLabelText("About Hina");
+    expect(infobox.className).toContain("order-1");
+    expect(infobox.className).toContain("@min-[34rem]:order-2");
   });
 });

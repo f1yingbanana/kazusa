@@ -12,7 +12,7 @@ export type Shelf = (typeof SHELVES)[number];
 
 export const SHELF_LABEL: Readonly<Record<Shelf, string>> = {
   places: "Places",
-  people: "People",
+  people: "Characters",
   groups: "Groups",
   concepts: "Concepts",
   days: "Diary",

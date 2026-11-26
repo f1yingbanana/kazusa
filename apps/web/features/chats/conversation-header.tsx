@@ -21,6 +21,7 @@ import { IconButton } from "@/ui/button";
 import { cx } from "@/ui/cx";
 import { CharacterAvatar } from "../characters/character-avatar";
 import { usePlainText } from "../wiki/links";
+import { PaneBackButton } from "@/ui/pane-nav";
 
 const MAX_FACES = 3;
 
@@ -71,6 +72,7 @@ export function ConversationHeader({
       inert={inert}
       className="flex min-h-16 shrink-0 items-center gap-3 border-b border-ui-line ps-4 pe-2.5"
     >
+      <PaneBackButton />
       {leading}
       {faces.length > 0 ? (
         <button

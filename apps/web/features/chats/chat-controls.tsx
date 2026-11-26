@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { useQueryStates } from "nuqs";
 import { useMemo, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/ui/toast";
 import { useAccess } from "@/hooks/use-access";
 import { useBridges } from "@/hooks/use-bridges";
 import { useCastPicks } from "@/hooks/use-cast-picks";
@@ -54,7 +54,7 @@ export function aloneCopy(
     body: canAdd
       ? inPerson
         ? "Call someone over to start talking."
-        : "Messages wait until someone joins. Add people to get it going."
+        : "Messages wait until someone joins. Add characters to get it going."
       : "No one else is here yet.",
   };
 }
@@ -300,11 +300,11 @@ export function AddPeople({
     >
       <PopoverTrigger className={buttonClass({ size, tone: "soft" })}>
         <UserPlusIcon aria-hidden />
-        {inPerson ? "Call over" : "Add people"}
+        {inPerson ? "Call over" : "Add characters"}
       </PopoverTrigger>
       <PopoverContent className="w-[min(22rem,calc(100vw-2rem))]">
         <PopoverTitle>
-          {inPerson ? "Call people over" : "Add people"}
+          {inPerson ? "Call characters over" : "Add characters"}
         </PopoverTitle>
         {count === 0 ? (
           <PopoverText>
@@ -315,7 +315,7 @@ export function AddPeople({
         ) : (
           <>
             <PickList
-              label="People"
+              label="Characters"
               groups={groups}
               value={picked}
               onValueChange={setPicked}

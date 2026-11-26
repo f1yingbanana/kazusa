@@ -16,7 +16,7 @@ import { useSources } from "@/lib/source/provider";
 import { setDraftChat, useDraftChat } from "@/lib/state/chat-draft";
 import { serializeEntityRef } from "@/lib/state/entity-ref";
 import { keepsLinkedSelection, markQuietSelection } from "@/lib/state/ui-store";
-import { chatsParsers } from "../legacy";
+import { chatsParsers } from "./search-params";
 import { Conversation, ObservedConversation } from "./conversation";
 import { conversationParsers } from "./open";
 
@@ -106,8 +106,7 @@ export function ChatsStage() {
       return;
     }
     // With the chat list still loading, an existing DM looks like none: wait.
-    if (accessLoading || chatsLoading || handledDm.current === dmTarget)
-      return;
+    if (accessLoading || chatsLoading || handledDm.current === dmTarget) return;
     handledDm.current = dmTarget;
     // You and them: the one you play, or you yourself while playing nobody (to
     // the system agent: your console).

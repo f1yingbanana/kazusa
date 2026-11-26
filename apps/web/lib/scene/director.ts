@@ -7,13 +7,6 @@ import { figureColumns, type SlotCount } from "./layout";
 import { revealFraction } from "./reveal";
 import type { Figure, Look, SceneLine, SceneState, Spoken } from "./state";
 
-/** Earlier lines shown as echoes above the panel; older ones are dropped. */
-export const MAX_ECHOES = 2;
-/**
- * About how long an echo stays after it left the panel, outside reading mode
- * (the renderer fades it, holding it while hovered, then sends `fade`).
- */
-export const ECHO_MS = 12_000;
 /** How many of the latest messages a scene opens with (or catches up by). */
 export const HISTORY_MESSAGES = 6;
 /**
@@ -115,9 +108,7 @@ export type SceneEvent =
    * Reading mode on or off. On, every new line waits for `show-next`; off,
    * everything waiting is shown at once.
    */
-  | { readonly type: "reading"; readonly on: boolean; readonly at: number }
-  /** The renderer has faded an echo out. */
-  | { readonly type: "fade"; readonly messageId: string };
+  | { readonly type: "reading"; readonly on: boolean; readonly at: number };
 
 const NEUTRAL: Look = {};
 const WIDE =
@@ -550,7 +541,7 @@ function beingSaid(speakerId: string, spoken: Spoken): SceneLine {
 }
 
 function known(state: SceneState, messageId: string): boolean {
-  return [state.line, ...state.echoes, ...state.ahead].some(
+  return [state.line, ...state.ahead].some(
     (line) => line?.messageId === messageId,
   );
 }
@@ -559,29 +550,26 @@ const saidBy = (line: SceneLine | undefined, id: string): boolean =>
   line !== undefined && isBeingSaid(line) && line.speakerId === id;
 
 /**
- * Who is saying a line that is already on screen (the panel or the echoes): to
- * the reader they have said it, however long its saying still runs.
+ * Who is saying a line that is already on screen: to the reader they have said
+ * it, however long its saying still runs.
  */
 export function sayingOnScreen(state: SceneState): string[] {
-  return [state.line, ...state.echoes].flatMap((line) =>
-    line && isBeingSaid(line) ? [line.speakerId] : [],
-  );
+  return state.line && isBeingSaid(state.line) ? [state.line.speakerId] : [];
 }
 
 /** Where the line `id` is saying is shown or waits, if anywhere. */
 function whereSaid(
   state: SceneState,
   id: string,
-): "line" | "echoes" | "ahead" | undefined {
+): "line" | "ahead" | undefined {
   if (saidBy(state.line, id)) return "line";
-  if (state.echoes.some((line) => saidBy(line, id))) return "echoes";
   if (state.ahead.some((line) => saidBy(line, id))) return "ahead";
   return undefined;
 }
 
 /**
  * Changes the line `id` is saying wherever it is, in place; `undefined` takes
- * it away (from the panel: the line it pushed up comes back).
+ * it away.
  */
 function mapSaid(
   state: SceneState,
@@ -596,39 +584,21 @@ function mapSaid(
     });
   let next: SceneState = {
     ...state,
-    echoes: each(state.echoes),
     ahead: each(state.ahead),
   };
   if (state.line && saidBy(state.line, id)) {
-    const line = change(state.line);
-    if (line) next = { ...next, line };
-    else {
-      const back = next.echoes.at(-1);
-      next = back
-        ? { ...next, line: back, echoes: next.echoes.slice(0, -1) }
-        : { ...next, line: undefined };
-    }
+    next = { ...next, line: change(state.line) };
   }
   return next;
 }
 
-/**
- * `line` goes into the panel; the line it replaces becomes the newest echo
- * (`at`: when it left), and at most `MAX_ECHOES` stay. A line still being said
- * goes on being said there.
- */
+/** `line` goes into the panel. A line still being said goes on being said there. */
 function place(
   state: SceneState,
   line: SceneLine,
-  at: number | undefined,
+  _at: number | undefined,
 ): SceneState {
-  const old = state.line;
-  const echoes = old
-    ? [...state.echoes, at === undefined ? old : { ...old, leftAt: at }].slice(
-        -MAX_ECHOES,
-      )
-    : state.echoes;
-  return { ...state, line, echoes };
+  return { ...state, line };
 }
 
 /**
@@ -662,7 +632,7 @@ function unshown(state: SceneState): string | undefined {
  */
 function present(state: SceneState, at?: number): SceneState {
   let next = state;
-  for (const line of [next.line, ...next.echoes, ...next.ahead])
+  for (const line of [next.line, ...next.ahead])
     if (line && isBeingSaid(line) && !(line.speakerId in next.saying))
       next = mapSaid(next, line.speakerId, () => undefined);
   const id = at === undefined || next.reading ? undefined : unshown(next);
@@ -793,10 +763,9 @@ function withMessage(
     return present(
       mapSaid(next, id, (old) => ({
         ...line,
-        // The same line on screen: when it was said, shown and pushed up.
+        // The same line on screen: when it was said and shown.
         ...(old.said ? { said: old.said } : {}),
         ...(old.shownAt === undefined ? {} : { shownAt: old.shownAt }),
-        ...(old.leftAt === undefined ? {} : { leftAt: old.leftAt }),
       })),
       at,
     );
@@ -926,7 +895,6 @@ export function createScene(seed: SceneSeed): SceneState {
       speakers: [],
       figures: [],
       line: undefined,
-      echoes: [],
       ahead: [],
       saying: {},
       reading: false,
@@ -1055,14 +1023,6 @@ export function direct(state: SceneState, event: SceneEvent): SceneState {
             { ...flush(state, event.at), reading: false, wanted: false },
             event.at,
           );
-    case "fade": {
-      const echoes = state.echoes.filter(
-        (line) => line.messageId !== event.messageId,
-      );
-      return echoes.length === state.echoes.length
-        ? state
-        : { ...state, echoes };
-    }
   }
 }
 

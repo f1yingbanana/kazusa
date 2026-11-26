@@ -14,10 +14,11 @@ import { TITLE_TRANSITION } from "./motion";
 import { wikiPatch } from "./open";
 import { wikiParsers } from "./search-params";
 import { SHELF_ICON } from "./shelf-icon";
+import { PaneBackButton } from "@/ui/pane-nav";
 
 const KIND_WORD = {
   places: "Place",
-  people: "Person",
+  people: "Character",
   groups: "Group",
   concepts: "Concept",
   days: "Diary day",
@@ -41,24 +42,46 @@ export function Eyebrow({
     page.place && places ? ancestors(places, page.id).reverse() : [];
   const kinds = shelves.filter((shelf) => shelf !== "places" || !areas.length);
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[0.8125rem] font-bold text-ui-soft">
+    <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[0.8125rem] font-bold text-ui-soft max-sm:flex-nowrap max-sm:overflow-hidden max-sm:whitespace-nowrap">
       {lead}
       {areas.length ? (
-        <span className="inline-flex items-center text-ui-primary [&_svg]:size-3.5">
+        <span className="inline-flex shrink-0 items-center text-ui-primary [&_svg]:size-3.5">
           {SHELF_ICON.places}
         </span>
       ) : null}
-      {areas.map((area, at) => (
-        <Fragment key={area}>
-          {at ? (
-            <ChevronRightIcon
-              aria-hidden
-              className="size-3 shrink-0 opacity-60 rtl:-scale-x-100"
-            />
-          ) : null}
-          <WikiLink id={area} />
-        </Fragment>
-      ))}
+      {areas.map((area, at) => {
+        // On a phone a long chain keeps its ends on one line: the outermost
+        // area, an ellipsis, then the place just around this one.
+        const middle = at > 0 && at < areas.length - 1;
+        return (
+          <Fragment key={area}>
+            {at ? (
+              <ChevronRightIcon
+                aria-hidden
+                className={cx(
+                  "size-3 shrink-0 opacity-60 rtl:-scale-x-100",
+                  middle && "max-sm:hidden",
+                )}
+              />
+            ) : null}
+            {at === 1 && areas.length > 2 ? (
+              <span aria-hidden className="hidden max-sm:inline">
+                …
+              </span>
+            ) : null}
+            <span
+              className={cx(
+                middle && "max-sm:hidden",
+                at > 0 && at === areas.length - 1
+                  ? "min-w-0 max-sm:truncate"
+                  : "shrink-0",
+              )}
+            >
+              <WikiLink id={area} />
+            </span>
+          </Fragment>
+        );
+      })}
       {kinds.map((shelf, at) => (
         <Fragment key={shelf}>
           {at || areas.length ? <span aria-hidden>·</span> : null}
@@ -92,6 +115,7 @@ export function PageHead({
   return (
     <header className={cx("flex flex-col gap-2", className)}>
       <div className="flex items-start gap-3">
+        <PaneBackButton className="mt-0.5" />
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           {eyebrow}
           <h1
@@ -124,11 +148,15 @@ export function Sheet({
   children: ReactNode;
 }) {
   return (
-    <div className="mt-px flex min-h-0 scrollbar-gutter-stable flex-col overflow-y-auto">
+    <div className="mt-px flex min-h-0 scrollbar-gutter-stable flex-col overflow-y-auto ui-vt-clip">
+      {/* Outside the CSS build, which can't parse this pseudo-element yet. */}
+      <style href="wiki-sheet-clip" precedence="default">
+        {"::view-transition-group-children(wiki-sheet){overflow:clip}"}
+      </style>
       <article
         aria-label={label}
         className={cx(
-          "@container mx-auto flex w-full min-w-0 flex-col gap-6 px-8 pt-6 pb-12 motion-safe:animate-ui-enter max-lg:px-6 max-md:px-4 max-md:pt-4",
+          "@container mx-auto flex w-full min-w-0 flex-col gap-6 px-8 pt-6 pb-12 lg:motion-safe:animate-ui-enter max-lg:px-6 max-md:px-4 max-md:pt-4",
           wide ? "max-w-6xl" : "max-w-5xl",
         )}
       >

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/ui/toast";
 import useSWR from "swr";
 import { useAccess } from "@/hooks/use-access";
 import { useRealtimeStore } from "@/lib/live/realtime-state";
@@ -368,28 +368,26 @@ export function ConnectionSettings() {
   return (
     <SettingsPage
       title="Connection"
-      description="Your browser only talks to this app's proxy, keeping Gateway credentials on the server."
+      description="Your browser talks to this proxy; Gateway credentials stay on the server."
     >
-      <SettingsSection title="Status">
-        <SettingsGroup>
-          <SettingsRow
-            icon={<StatusDot tone={tone} />}
-            title={<span role="status">{statusLabel}</span>}
-            detail={
-              <span className="font-[ui-monospace,monospace] text-xs">
-                {detail}
-              </span>
-            }
-            action={
-              down ? (
-                <Button size="sm" tone="soft" onClick={retryBackend}>
-                  Retry
-                </Button>
-              ) : null
-            }
-          />
-        </SettingsGroup>
-      </SettingsSection>
+      <SettingsGroup>
+        <SettingsRow
+          icon={<StatusDot tone={tone} />}
+          title={<span role="status">{statusLabel}</span>}
+          detail={
+            <span className="font-[ui-monospace,monospace] text-xs">
+              {detail}
+            </span>
+          }
+          action={
+            down ? (
+              <Button size="sm" tone="soft" onClick={retryBackend}>
+                Retry
+              </Button>
+            ) : null
+          }
+        />
+      </SettingsGroup>
 
       <RemoteGatewaySection />
 

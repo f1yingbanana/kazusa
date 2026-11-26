@@ -5,10 +5,12 @@ import type {
   WikiListItem,
   WikiSourceResponse,
 } from "@kazusa/client";
-import { CheckIcon, PencilIcon } from "lucide-react";
+import { PencilIcon, StarIcon } from "lucide-react";
 import { parseAsString, useQueryStates } from "nuqs";
 import { type ReactNode, useEffect, useState } from "react";
 import { useAccess } from "@/hooks/use-access";
+import { useMediaQuery } from "@/hooks/use-media-query";
+import { toggleWatch, useWatchlist } from "@/lib/state/preferences-store";
 import { isCast, useCharacters } from "@/hooks/use-characters";
 import { useSelection } from "@/hooks/use-selection";
 import { useWikiReach } from "@/hooks/use-wiki-editor";
@@ -16,7 +18,7 @@ import { usePageLookup, useWikiList, useWikiPage } from "@/hooks/use-wiki";
 import { serializeEntityRef } from "@/lib/state/entity-ref";
 import { markQuietSelection } from "@/lib/state/ui-store";
 import { isOwnSection } from "@/lib/wiki/layers";
-import { Button } from "@/ui/button";
+import { Button, IconButton } from "@/ui/button";
 import { cx } from "@/ui/cx";
 import { Note } from "@/ui/note";
 import { Tabs, TabsList, TabsPanel, TabsTab } from "@/ui/tabs";
@@ -39,7 +41,7 @@ import { CastNotes, WhoKnows } from "./who-knows";
 
 const PART_LABEL: Readonly<Record<PagePart, string>> = {
   page: "Page",
-  people: "People",
+  people: "Characters",
   looks: "Looks",
   memory: "Memory",
   backdrop: "Backdrop",
@@ -83,8 +85,17 @@ export function WorldPage({
   const cast = isCast(character) ? character : undefined;
   const listed = lookup(id);
   const page = read.data?.world;
-  const editing = canManage && params["wiki.edit"] === "world";
-  const raw = params["wiki.raw"] === "1";
+  const paramEditing = canManage && params["wiki.edit"] === "world";
+  const paramRaw = params["wiki.raw"] === "1";
+  const [pendingEdit, setPendingEdit] = useState<boolean | null>(null);
+  const [pendingRaw, setPendingRaw] = useState<boolean | null>(null);
+  if (pendingEdit !== null && paramEditing === pendingEdit)
+    setPendingEdit(null);
+  if (pendingRaw !== null && paramRaw === pendingRaw) setPendingRaw(null);
+  const editing = canManage && (pendingEdit ?? paramEditing);
+  const wideEnough = useMediaQuery("(min-width: 768px)");
+  const watchlist = useWatchlist();
+  const raw = pendingRaw ?? paramRaw;
   const name =
     page?.name ?? listed?.name ?? params["wiki.name"] ?? character?.name ?? id;
   const kind: WikiKind | undefined =
@@ -106,14 +117,15 @@ export function WorldPage({
   }, [id, subject, select]);
 
   const edit = (on: boolean, asRaw = false) =>
-    withTransition(
-      () =>
-        void setParams({
-          "wiki.edit": on ? "world" : null,
-          "wiki.raw": on && asRaw ? "1" : null,
-          ...(on ? {} : { "wiki.kind": null, "wiki.name": null }),
-        }),
-    );
+    withTransition(() => {
+      setPendingEdit(on);
+      setPendingRaw(on && asRaw);
+      void setParams({
+        "wiki.edit": on ? "world" : null,
+        "wiki.raw": on && asRaw ? "1" : null,
+        ...(on ? {} : { "wiki.kind": null, "wiki.name": null }),
+      });
+    });
   const done = (saved?: WikiSourceResponse) => {
     if (saved) void refresh();
     if (saved && saved.id !== id) void setParams(wikiPatch(saved.id));
@@ -147,9 +159,10 @@ export function WorldPage({
           side="world"
           raw={raw}
           onRaw={(on) =>
-            withTransition(
-              () => void setParams({ "wiki.raw": on ? "1" : null }),
-            )
+            withTransition(() => {
+              setPendingRaw(on);
+              void setParams({ "wiki.raw": on ? "1" : null });
+            })
           }
           onDone={done}
         />
@@ -157,17 +170,10 @@ export function WorldPage({
     );
 
   const hasOwn = Boolean(page?.sections.some((s) => isOwnSection(s, id)));
+  const phone = !wideEnough;
 
-  const editButton = editing ? (
-    <Button
-      tone="primary"
-      size="sm"
-      icon={<CheckIcon aria-hidden />}
-      onClick={() => edit(false)}
-    >
-      Done
-    </Button>
-  ) : (
+  // Editing, the way back is at the editor's foot (Cancel, Save, Close).
+  const editButton = editing ? null : (
     <Button
       tone="ghost"
       size="sm"
@@ -178,21 +184,39 @@ export function WorldPage({
     </Button>
   );
 
+  const canEdit =
+    canManage &&
+    !editing &&
+    (part === "looks" ||
+      part === "memory" ||
+      part === "backdrop" ||
+      (part === "page" && Boolean(page)));
+  // A phone's tab row has no room for the button: Edit goes in More.
+  const editInMenu = phone && Boolean(page);
+
+  const starred = cast ? watchlist.includes(cast.id) : false;
+  const favorite = cast
+    ? { on: starred, toggle: () => toggleWatch(cast.id) }
+    : undefined;
+
   const actions = (
     <>
-      {part === "looks" || part === "memory"
-        ? canManage
-          ? editButton
-          : null
-        : part === "backdrop"
-          ? canManage && !editing
-            ? editButton
-            : null
-          : part === "page" && canManage && page && !editing
-            ? editButton
-            : null}
+      {favorite && !editInMenu ? (
+        <IconButton
+          label={starred ? "Unfavorite" : "Favorite"}
+          size="md"
+          aria-pressed={starred}
+          className="aria-pressed:text-ui-primary [&[aria-pressed=true]_svg]:fill-current"
+          onClick={favorite.toggle}
+        >
+          <StarIcon aria-hidden />
+        </IconButton>
+      ) : null}
+      {canEdit && !editInMenu ? editButton : null}
       {page ? (
         <PageMenu
+          onEdit={canEdit && editInMenu ? () => edit(true) : undefined}
+          favorite={editInMenu ? favorite : undefined}
           id={id}
           name={name}
           kind={kind}
@@ -289,11 +313,18 @@ export function WorldPage({
         <div
           style={BODY_TRANSITION}
           className={cx(
-            "grid items-start gap-6 pt-6 motion-safe:animate-ui-enter @min-[34rem]:grid-cols-[minmax(0,1fr)_14rem] @min-[48rem]:grid-cols-[minmax(0,40rem)_16rem] @min-[48rem]:gap-10",
+            "grid items-start gap-6 pt-6 lg:motion-safe:animate-ui-enter @min-[34rem]:grid-cols-[minmax(0,1fr)_14rem] @min-[48rem]:grid-cols-[minmax(0,40rem)_16rem] @min-[48rem]:gap-10",
             part === "backdrop" && "hidden",
           )}
         >
-          <div className="min-w-0">
+          <div
+            className={cx(
+              "min-w-0",
+              part === "page" && showFacts
+                ? "order-2 @min-[34rem]:order-1"
+                : "order-1",
+            )}
+          >
             <TabsPanel value="page">
               <div className="flex flex-col gap-6">
                 <PageProblems pages={[`world/${id}`]} />
@@ -307,11 +338,19 @@ export function WorldPage({
                   <PeopleTab character={cast} />
                 </TabsPanel>
                 <TabsPanel value="looks">
-                  <LooksTab character={cast} editing={editing} />
+                  <LooksTab
+                    character={cast}
+                    editing={editing}
+                    onClose={() => edit(false)}
+                  />
                 </TabsPanel>
                 {cast.kind === "agent" ? (
                   <TabsPanel value="memory">
-                    <MemoryTab character={cast} editing={editing} />
+                    <MemoryTab
+                      character={cast}
+                      editing={editing}
+                      onClose={() => edit(false)}
+                    />
                   </TabsPanel>
                 ) : null}
               </>
@@ -329,7 +368,13 @@ export function WorldPage({
               page={page}
               fallback={{ id, name, kind }}
               reach={reach}
-              className="@max-[34rem]:max-w-80 @min-[34rem]:sticky @min-[34rem]:top-16"
+              className={cx(
+                "@max-[34rem]:max-w-sm @min-[34rem]:sticky @min-[34rem]:top-4",
+                // In one column the box heads the page and no other tab.
+                part === "page"
+                  ? "order-1 @min-[34rem]:order-2"
+                  : "order-2 @max-[34rem]:hidden",
+              )}
             />
           ) : null}
         </div>

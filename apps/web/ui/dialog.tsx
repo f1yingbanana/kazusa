@@ -9,10 +9,12 @@ import {
 } from "@ui-sdk/react/alert-dialog";
 import {
   DialogBackdrop,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogTitle,
 } from "@ui-sdk/react/dialog";
+import { XIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { cx } from "./cx";
 import { BACKDROP } from "./overlay";
@@ -46,6 +48,7 @@ export function DialogPanel({
   footer,
   size = "md",
   full = false,
+  closable = false,
   className,
   children,
 }: {
@@ -54,6 +57,8 @@ export function DialogPanel({
   footer?: ReactNode;
   size?: keyof typeof WIDTH;
   full?: boolean;
+  /** A close button at the top right, for a dialog with no Cancel. */
+  closable?: boolean;
   className?: string;
   children?: ReactNode;
 }) {
@@ -70,12 +75,22 @@ export function DialogPanel({
           className,
         )}
       >
-        <div className="flex flex-col gap-1">
-          <DialogTitle className={TITLE}>{title}</DialogTitle>
-          {description ? (
-            <DialogDescription className={TEXT}>
-              {description}
-            </DialogDescription>
+        <div className="flex items-start gap-2">
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <DialogTitle className={TITLE}>{title}</DialogTitle>
+            {description ? (
+              <DialogDescription className={TEXT}>
+                {description}
+              </DialogDescription>
+            ) : null}
+          </div>
+          {closable ? (
+            <DialogClose
+              aria-label="Close"
+              className="-me-2 -mt-1.5 grid size-9 shrink-0 place-items-center rounded-full text-ui-soft hover:bg-ui-tint hover:text-ui-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-primary [&_svg]:size-4"
+            >
+              <XIcon aria-hidden />
+            </DialogClose>
           ) : null}
         </div>
         {children}
@@ -100,33 +115,42 @@ const ANSWER =
 /**
  * A question that needs an answer before going on, answered Cancel or Confirm:
  * the title and description say what confirming does. `danger` draws Confirm as
- * something that can't be taken back lightly.
+ * something that can't be taken back lightly. `children` explains more under
+ * the description; `aside` is another way out, before Cancel.
  */
 export function AlertPanel({
   title,
   description,
   danger = false,
+  size = "sm",
   agentConfirm,
+  aside,
+  children,
   onConfirm,
 }: {
   title: string;
   description: ReactNode;
   danger?: boolean;
+  size?: keyof typeof WIDTH;
   /** What an agent is told before it may press Confirm. */
   agentConfirm?: string;
+  aside?: ReactNode;
+  children?: ReactNode;
   onConfirm: () => void;
 }) {
   return (
     <>
       <AlertDialogBackdrop className={cx(BACKDROP, FADE)} />
-      <AlertDialogContent className={cx(SURFACE, WIDTH.sm)}>
+      <AlertDialogContent className={cx(SURFACE, WIDTH[size])}>
         <div className="flex flex-col gap-1">
           <AlertDialogTitle className={TITLE}>{title}</AlertDialogTitle>
           <AlertDialogDescription className={TEXT}>
             {description}
           </AlertDialogDescription>
         </div>
+        {children}
         <DialogFoot>
+          {aside ? <div className="max-sm:contents">{aside}</div> : null}
           <AlertDialogClose
             className={cx(
               ANSWER,

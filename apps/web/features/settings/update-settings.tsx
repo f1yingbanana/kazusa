@@ -8,7 +8,7 @@ import {
   RefreshCwIcon,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/ui/toast";
 import { useUpdate, type UpdatePhase } from "@/hooks/use-update";
 import {
   offered,
@@ -535,7 +535,7 @@ export function UpdateSettings() {
   return (
     <SettingsPage
       title="Updates"
-      description="Keep Kazusa and your world template up to date."
+      description="Keep Kazusa and your world up to date."
     >
       <KazusaVersion />
       <WorldVersion />

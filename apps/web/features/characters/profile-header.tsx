@@ -42,7 +42,13 @@ function turnTo(id: string) {
  * Back to the cast, and the previous and next person in it. ← and → turn the
  * page too, unless a control that uses them has focus.
  */
-export function CastNav({ id }: { id: string }) {
+export function CastNav({
+  id,
+  onBack,
+}: {
+  id: string;
+  onBack?: (leave: () => void) => void;
+}) {
   const { order } = useCastBook();
   const [, setParams] = useQueryStates({
     ...charactersParsers,
@@ -91,7 +97,11 @@ export function CastNav({ id }: { id: string }) {
         icon={<ArrowLeftIcon aria-hidden className="rtl:-scale-x-100" />}
         className="-ms-3"
         title="Back to everyone"
-        onClick={() => void setParams(leaveProfile())}
+        onClick={() => {
+          const leave = () => void setParams(leaveProfile());
+          if (onBack) onBack(leave);
+          else leave();
+        }}
       >
         Back
       </Button>

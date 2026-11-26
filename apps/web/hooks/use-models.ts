@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
-import { toast } from "sonner";
+import { toast } from "@/ui/toast";
 import type { ModelsResponse, ThinkingLevel } from "@kazusa/client";
 import {
   MODELS_KEY,

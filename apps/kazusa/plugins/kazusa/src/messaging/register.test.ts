@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import { beginGatewayLifetime, noteShutdown } from "../shutdown.ts";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import { Socket } from "node:net";
@@ -1058,6 +1059,41 @@ describe("send_message SDK integration", () => {
     // Unhandled, this event would end the process.
     expect(res.listenerCount("error")).toBeGreaterThan(0);
     res.emit("close");
+  });
+
+  it("ends an event stream when the Gateway starts to stop, so the drain needn't wait for it", async () => {
+    const h = await setup();
+    const route = h.routes.get("/kazusa/events");
+    if (!route) throw new Error("Missing route: /kazusa/events");
+    const res = Object.assign(new EventEmitter(), {
+      destroyed: false,
+      writableEnded: false,
+      writableLength: 0,
+      setHeader: () => {},
+      writeHead: () => {},
+      write: () => true,
+      end: () => {
+        res.writableEnded = true;
+      },
+      destroy: () => {
+        res.destroyed = true;
+      },
+    });
+    const req = Object.assign(Readable.from([]), {
+      method: "GET",
+      url: "/kazusa/events",
+      headers: { authorization: "Bearer test-service-token" },
+      socket: new Socket(),
+    });
+    await route.handler(
+      req as unknown as IncomingMessage,
+      res as unknown as ServerResponse,
+    );
+    expect(res.writableEnded).toBe(false);
+    noteShutdown("test");
+    expect(res.writableEnded).toBe(true);
+    res.emit("close");
+    beginGatewayLifetime();
   });
 
   it("refuses visitor messages, typing and membership changes before touching the world", async () => {

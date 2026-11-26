@@ -3,7 +3,7 @@
 import type { BridgeStatus } from "@kazusa/client";
 import { HashIcon, KeyRoundIcon, UserRoundIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/ui/toast";
 import { useChatTitle } from "@/features/entities/chat-meta";
 import { useAccess } from "@/hooks/use-access";
 import { useBridgeAccount } from "@/hooks/use-bridge-account";
@@ -86,7 +86,7 @@ function AccountRow({ bot }: { bot: string | null }) {
     }
     const timer = setTimeout(() => {
       setCode(null);
-      toast.message("The code ran out. Make a new one to link.");
+      toast("The code ran out. Make a new one to link.");
     }, left);
     return () => clearTimeout(timer);
   }, [code]);
@@ -456,10 +456,7 @@ export function ChatAppsSettings() {
   const links = bridges.data?.links ?? [];
 
   return (
-    <SettingsPage
-      title="Chat apps"
-      description="Connect external chat apps so characters and players can talk there too."
-    >
+    <SettingsPage title="Chat apps" description="Connect external chat apps.">
       <SettingsSection
         title="Discord"
         description="Send and receive messages directly in Discord."

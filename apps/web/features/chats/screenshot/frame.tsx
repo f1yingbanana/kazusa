@@ -31,25 +31,39 @@ const MARK_PX = 3;
  * black: a light theme darkens, a dark one all but hides.
  */
 const DIM =
-  "color-mix(in oklch, color-mix(in oklch, var(--ui-ground) 55%, black) 82%, transparent)";
-/** Hatching over a message left out inside the frame: out, at a glance. */
+  "color-mix(in oklch, color-mix(in oklch, var(--ui-ground) 40%, black) 56%, transparent)";
+/**
+ * A message left out inside the frame: the outside's dim with the theme's line
+ * colour in soft stripes, and a "Left out" chip, so out reads at a glance.
+ */
 const HATCH =
-  "repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in oklch, var(--ui-ink) 26%, transparent) 6px 7px)";
+  "repeating-linear-gradient(135deg, transparent 0 8px, color-mix(in oklch, var(--ui-line) 70%, transparent) 8px 10px)";
 /** The floating bar and the button above it cover the viewport's foot. */
 const BAR_CLEARANCE_PX = 96;
 /** How close to the viewport's edge a drag starts scrolling it. */
 const SCROLL_ZONE_PX = 56;
 const SCROLL_STEP_PX = 14;
 
-/** Where each message is in the transcript, which scrolls with it. */
+/**
+ * Where each message is in the transcript, which scrolls with it. A message
+ * that opens its run starts at the speaker's name above it, and one that closes
+ * its run reaches down through the time and read receipt beneath it, so both
+ * the frame and any left-out overlay cover everything that belongs to it.
+ */
 function measure(content: HTMLElement, ids: readonly string[]): ShotBounds[] {
   const origin = content.getBoundingClientRect().top;
   return ids.map((id) => {
     const element = content.querySelector(`[data-shot-id="${CSS.escape(id)}"]`);
     const rect = element?.getBoundingClientRect();
-    return rect
-      ? { top: rect.top - origin, bottom: rect.bottom - origin }
-      : { top: 0, bottom: 0 };
+    if (!element || !rect) return { top: 0, bottom: 0 };
+    const run = element.parentElement;
+    const rows = run?.querySelectorAll("[data-shot-id]");
+    const opens = rows?.[0] === element;
+    const closes = rows && rows[rows.length - 1] === element;
+    const runRect = (opens || closes) && run ? run.getBoundingClientRect() : null;
+    const top = opens && runRect ? runRect.top : rect.top;
+    const bottom = closes && runRect ? runRect.bottom : rect.bottom;
+    return { top: top - origin, bottom: bottom - origin };
   });
 }
 
@@ -91,6 +105,8 @@ export function ScreenshotFrame({
   const [box, setBox] = useState<{
     top: number;
     height: number;
+    /** How far the dim must reach to cover the whole transcript. */
+    reach: number;
     /**
      * Left-out runs, in the transcript's coordinates like the frame (not inside
      * it, so they never ride along while the frame moves), flush with an edge
@@ -126,7 +142,8 @@ export function ScreenshotFrame({
         atEnd,
       };
     });
-    setBox({ top, height, gaps });
+    const reach = Math.max(parent.scrollHeight, window.innerHeight) * 2;
+    setBox({ top, height, reach, gaps });
   }, [ids, range.start, range.end, excluded]);
 
   // Messages grow as they load in, scroll into view or arrive.
@@ -249,8 +266,12 @@ export function ScreenshotFrame({
             backgroundColor: DIM,
             backgroundImage: HATCH,
           }}
-          className="pointer-events-none absolute inset-x-2 z-10"
-        />
+          className="pointer-events-none absolute -inset-x-2 z-10 grid place-items-center"
+        >
+          <span className="rounded-full bg-ui-surface px-2.5 py-0.5 text-xs font-bold text-ui-soft shadow-ui">
+            Left out
+          </span>
+        </div>
       ))}
       <div
         ref={frame}
@@ -259,11 +280,12 @@ export function ScreenshotFrame({
           ...(box ? { top: box.top, height: box.height } : {}),
           borderRadius: RADIUS_PX,
           // The dim is the frame's own shadow, so it can't catch clicks: the
-          // messages under it stay pickable.
-          boxShadow: `0 0 0 200vmax ${DIM}`,
+          // messages under it stay pickable. It reaches past the whole
+          // transcript, however long.
+          boxShadow: `0 0 0 ${box?.reach ?? 4000}px ${DIM}`,
         }}
         className={cx(
-          "pointer-events-none absolute inset-x-2 z-10",
+          "pointer-events-none absolute -inset-x-2 z-10",
           "outline-[1.5px] outline-ui-primary outline-solid",
           !box && "invisible",
         )}
@@ -449,7 +471,7 @@ export function ScreenshotBar({
     <div
       role="toolbar"
       aria-label="Screenshot"
-      className="absolute inset-x-3 bottom-4 z-20 mx-auto flex max-w-md items-center gap-2 rounded-full ui-raised py-1.5 ps-5 pe-1.5 motion-safe:animate-ui-enter"
+      className="absolute inset-x-3 bottom-3 z-20 mx-auto flex max-w-md items-center gap-2 rounded-full ui-raised py-1.5 ps-5 pe-1.5 motion-safe:animate-ui-enter sm:bottom-5"
     >
       <div className="flex min-w-0 flex-1 flex-col" aria-live="polite">
         <span className="text-sm font-bold tabular-nums">

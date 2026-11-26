@@ -23,7 +23,6 @@ export function DomRenderer({
   notice,
   footer,
   reading,
-  onBacklog,
   morph,
 }: {
   chatId: string;
@@ -40,8 +39,6 @@ export function DomRenderer({
   footer?: ReactNode;
   /** Reading mode: lines wait for the reader; what the panel says. */
   reading?: ReadingStatus;
-  /** Opens the backlog (from an echo). */
-  onBacklog?: () => void;
   /** A view transition name for the dialogue panel. */
   morph?: string;
 }) {
@@ -75,7 +72,6 @@ export function DomRenderer({
         notice={notice}
         footer={footer}
         reading={reading}
-        onBacklog={onBacklog}
         morph={morph}
       />
     </>

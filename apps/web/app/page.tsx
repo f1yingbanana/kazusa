@@ -5,7 +5,7 @@ import { parseAuthMode } from "@kazusa/client";
 import { OwnerGate } from "@/components/auth/owner-sign-in";
 import { SetupGuide } from "@/components/setup/setup-guide";
 import { StartOver } from "@/components/setup/start-over";
-import { Shell } from "@/components/shell/shell";
+import { Shell } from "@/features/shell/shell";
 import { setup } from "@/lib/setup/setup";
 import { AuthError, isAllowedHost, resolveViewer } from "@/lib/auth/access";
 
