@@ -124,7 +124,7 @@ function NewChatForm({
         noValidate
       >
         <PickList
-          label="People"
+          label="Characters"
           groups={groups}
           value={picked}
           onValueChange={setPicked}

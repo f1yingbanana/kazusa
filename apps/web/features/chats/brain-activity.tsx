@@ -82,7 +82,13 @@ export function BrainThinking() {
   );
 }
 
-function CallSteps({ call, running }: { call: BrainCall; running: boolean }) {
+export function CallSteps({
+  call,
+  running,
+}: {
+  call: BrainCall;
+  running: boolean;
+}) {
   return (
     <>
       <TraceLine

@@ -79,6 +79,10 @@
   --animate-ui-rise: ui-rise 200ms ease-out both;
   --animate-ui-fade-out: ui-fade-out 1s ease-in forwards;
   --animate-ui-thread-in: ui-thread-in 280ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
+  --animate-ui-float-away: ui-float-away 1.2s cubic-bezier(0.2, 0.8, 0.3, 1)
+    forwards;
+  --animate-ui-pane-in: ui-pane-in 220ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
+  --animate-ui-pane-back: ui-pane-back 220ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
 
   @keyframes ui-pulse {
     50% {
@@ -205,6 +209,24 @@
       opacity: 0;
     }
   }
+  /* Pops out from the logo, then drifts down and right as it fades. */
+  @keyframes ui-float-away {
+    0% {
+      opacity: 0;
+      translate: 0 0;
+      scale: 0.7;
+    }
+    18% {
+      opacity: 1;
+      translate: 6px 6px;
+      scale: 1.08;
+    }
+    100% {
+      opacity: 0;
+      translate: var(--ui-drift-x, 24px) var(--ui-drift-y, 24px);
+      scale: 1;
+    }
+  }
   /*
     A circle opening from a point (--ui-from, the layer's centre by default).
     Clipping changes no box, so what's inside measures itself as usual.
@@ -237,6 +259,18 @@
     from {
       opacity: 0;
       translate: 0 6px;
+    }
+  }
+  /* A World talk opening on a phone slides in; closing, the list slides back. */
+  @keyframes ui-pane-in {
+    from {
+      translate: 100% 0;
+    }
+  }
+  @keyframes ui-pane-back {
+    from {
+      opacity: 0.4;
+      translate: -30% 0;
     }
   }
 }
@@ -293,4 +327,79 @@
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation-duration: 320ms;
+}
+/*
+  A wiki page's title and body glide between reading and editing inside the
+  page, clipped by it: the page is their group (nested view transition
+  groups), so a title rising past the top edge goes under it, not over the
+  top bar. Where nesting isn't supported they glide unclipped, as before. The
+  clip itself (::view-transition-group-children) is a rule the CSS build
+  can't parse yet, so the page sets it (Sheet in features/wiki/page-header).
+*/
+@utility ui-vt-clip {
+  view-transition-name: wiki-sheet;
+  view-transition-group: contain;
+}
+::view-transition-group(wiki-title) {
+  animation-duration: 320ms;
+  animation-timing-function: cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+::view-transition-old(wiki-title),
+::view-transition-new(wiki-title) {
+  height: auto;
+  inset-block: 50%;
+  translate: 0 -50%;
+  animation-duration: 320ms;
+}
+/*
+  A section's list and stage taking turns on a narrow screen (`slide` in
+  features/shell): going deeper slides the new one in from the right over the
+  old, which drifts left and dims; Back slides it out the way it came. Only
+  the element named `pane` moves; the bars around it stay.
+*/
+html[data-slide] .ui-vt-clip,
+html[data-slide] [style*="wiki-title"],
+html[data-slide] [style*="wiki-body"] {
+  view-transition-name: none !important;
+}
+html[data-slide]::view-transition-old(pane),
+html[data-slide]::view-transition-new(pane) {
+  animation-duration: 280ms;
+  animation-timing-function: cubic-bezier(0.2, 0.9, 0.3, 1);
+  mix-blend-mode: normal;
+}
+html[data-slide="forward"]::view-transition-new(pane) {
+  animation-name: ui-slide-from-end;
+}
+html[data-slide="forward"]::view-transition-old(pane) {
+  animation-name: ui-slide-to-start;
+}
+html[data-slide="back"]::view-transition-new(pane) {
+  animation-name: ui-slide-from-start;
+}
+html[data-slide="back"]::view-transition-old(pane) {
+  animation-name: ui-slide-to-end;
+  z-index: 1;
+}
+@keyframes ui-slide-from-end {
+  from {
+    translate: 100% 0;
+  }
+}
+@keyframes ui-slide-to-start {
+  to {
+    translate: -30% 0;
+    opacity: 0.4;
+  }
+}
+@keyframes ui-slide-from-start {
+  from {
+    translate: -30% 0;
+    opacity: 0.4;
+  }
+}
+@keyframes ui-slide-to-end {
+  to {
+    translate: 100% 0;
+  }
 }

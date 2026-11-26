@@ -29,14 +29,12 @@ export function PlacePeople({
   talkingOnly = false,
   selectedId,
   onPick,
-  onNavigated,
 }: {
   people: readonly CharacterSummary[];
   talks: readonly Talk[];
   talkingOnly?: boolean;
   selectedId?: string | null;
   onPick: (character: CharacterSummary) => void;
-  onNavigated?: () => void;
 }) {
   const byId = new Map(people.map((c) => [c.id, c]));
   const talking = new Set(talks.flatMap((t) => t.chat.members));
@@ -59,7 +57,6 @@ export function PlacePeople({
             people={talk.chat.members
               .map((m) => byId.get(m))
               .filter((c): c is CharacterSummary => Boolean(c))}
-            onNavigated={onNavigated}
           >
             {(c) => row(c)}
           </TalkGroupOf>
@@ -73,12 +70,10 @@ export function PlacePeople({
 function TalkGroupOf({
   talk,
   people,
-  onNavigated,
   children,
 }: {
   talk: Talk;
   people: readonly CharacterSummary[];
-  onNavigated?: () => void;
   children: (character: CharacterSummary) => React.ReactNode;
 }) {
   const selfOf = useSelfIn();
@@ -118,7 +113,6 @@ function TalkGroupOf({
         const patch = conversationPatch(talk.chat, self || selfOf(talk.chat));
         if (patch.sel) markQuietSelection(serializeEntityRef(patch.sel));
         void setParams(patch);
-        onNavigated?.();
       }}
     >
       {people.map(children)}

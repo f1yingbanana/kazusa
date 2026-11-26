@@ -121,7 +121,6 @@ export default defineConfig([
   },
   {
     files: ["features/**"],
-    ignores: ["features/legacy.ts"],
     rules: {
       "no-restricted-imports": [
         "error",
@@ -130,7 +129,7 @@ export default defineConfig([
             {
               group: ["@/components/*"],
               message:
-                "Borrow old components through features/legacy.ts, so what is left to port stays in one place.",
+                "components/ is the setup pages' old UI, on its way out: build from ui/ and features/.",
             },
             {
               group: ["@ui-sdk/*"],
@@ -142,8 +141,7 @@ export default defineConfig([
     },
   },
   {
-    files: ["components/**", "app/**", "lib/**", "hooks/**"],
-    ignores: ["app/halo/**"],
+    files: ["components/**"],
     rules: {
       "no-restricted-imports": [
         "error",
@@ -152,7 +150,7 @@ export default defineConfig([
             {
               group: ["@/ui/*", "@/features/*"],
               message:
-                "The old UI doesn't use the new one; that keeps components/ deletable.",
+                "The setup pages' old UI doesn't use the new one; that keeps components/ deletable.",
             },
           ],
         },

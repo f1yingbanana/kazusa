@@ -3,6 +3,7 @@
 import {
   useEffect,
   useEffectEvent,
+  useLayoutEffect,
   useRef,
   useState,
   type MouseEvent,
@@ -25,7 +26,7 @@ import { DomRenderer } from "./dom-renderer";
 const ADVANCE_SLACK_MS = 5;
 /** What a click or a key on is its own, not a request for the next line. */
 const OWN_CLICK =
-  "button, a, input, textarea, select, label, [data-notice], [data-reply], [data-echo]";
+  "button, a, input, textarea, select, label, [data-notice], [data-reply]";
 const TEXT_FIELD = "input, textarea, select, [contenteditable]";
 const PRESSABLE =
   "button, a, summary, [role=button], [role=radio], [role=checkbox], [role=tab]";
@@ -45,7 +46,6 @@ export function SceneView({
   footer,
   reading,
   onAdvance,
-  onBacklog,
   advanceable = true,
   morph,
 }: {
@@ -60,14 +60,12 @@ export function SceneView({
   reading?: ReadingStatus;
   /**
    * The reader asks for the next line: a click or tap on the scene or the panel
-   * (not on a control, the reply row or an echo), or Space, Enter or → with
-   * focus in the stage but not in a text field (Space and Enter not on a button
-   * either). Given only in reading mode, while nothing covers the scene; while
-   * it would do something the whole scene shows the pointer.
+   * (not on a control or the reply row), or Space, Enter or → with focus in the
+   * stage but not in a text field (Space and Enter not on a button either).
+   * Given only in reading mode, while nothing covers the scene; while it would
+   * do something the whole scene shows the pointer.
    */
   onAdvance?: () => void;
-  /** Opens the backlog (from an echo). */
-  onBacklog?: () => void;
   /** A view transition name for the dialogue panel. */
   morph?: string;
   /** An advance would do something now. */
@@ -80,7 +78,7 @@ export function SceneView({
   const [slots, setSlots] = useState<SlotCount | undefined>(undefined);
   // The scene's height in px: every figure is drawn at one scale from it.
   const [sceneHeight, setSceneHeight] = useState<number | undefined>(undefined);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const element = ref.current;
     if (!element) return;
     const measure = ({ width, height }: { width: number; height: number }) => {
@@ -178,7 +176,6 @@ export function SceneView({
           notice={notice}
           footer={footer}
           reading={reading}
-          onBacklog={onBacklog}
           morph={morph}
         />
       )}

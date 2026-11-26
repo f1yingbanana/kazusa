@@ -17,7 +17,6 @@ import { setClock, useClockStore } from "../lib/live/clock-state";
 import { useRealtimeStore } from "../lib/live/realtime-state";
 import {
   useSceneFigures,
-  useSceneEchoes,
   useSceneLine,
   useSceneStore,
 } from "../lib/live/scene-state";
@@ -57,11 +56,10 @@ vi.mock("../lib/source/scene/http", async (original) => ({
 }));
 
 const PLAYER = "user:you";
-/** What a scene shows: its echoes, oldest first, then the panel's line. */
+/** What a scene shows: the panel's line. */
 function useShown(chatId: string) {
-  const echoes = useSceneEchoes(chatId);
   const line = useSceneLine(chatId);
-  return line ? [...echoes, line] : echoes;
+  return line ? [line] : [];
 }
 const DAY = Date.UTC(2026, 10, 11);
 const HOUR = 3_600_000;
@@ -278,11 +276,7 @@ describe("scene wiring", () => {
       source?.emit({ type: "message", chatId: "huddle", message: line });
     });
     expect(useSceneStore.getState().scenes.huddle?.speakers).toEqual([]);
-    // Her line being said is filled in, the earlier one above it.
-    expect(result.current.lines.map((l) => l.text)).toEqual([
-      "Before you came.",
-      "Hi.",
-    ]);
+    expect(result.current.lines.map((l) => l.text)).toEqual(["Hi."]);
     // The player's send shows at once, under their name, and once.
     const mine = message(PLAYER, "Hello.");
     mine.senderName = "Player Name";
@@ -292,7 +286,7 @@ describe("scene wiring", () => {
     );
     expect(
       result.current.lines.map((l) => `${l.speakerName}: ${l.text}`),
-    ).toEqual(["alice: Before you came.", "alice: Hi.", "Player Name: Hello."]);
+    ).toEqual(["Player Name: Hello."]);
     // Reconnecting: speakers start over from the replayed typists.
     act(() =>
       source?.emit({
@@ -405,10 +399,7 @@ describe("scene wiring", () => {
         },
       }),
     );
-    expect(result.current.lines.map((l) => l.text)).toEqual([
-      "Earlier.",
-      "Later.",
-    ]);
+    expect(result.current.lines.map((l) => l.text)).toEqual(["Later."]);
     // An ended huddle: everyone walks off.
     vi.mocked(fetchObservedChats).mockResolvedValue({
       chats: [

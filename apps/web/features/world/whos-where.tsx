@@ -17,7 +17,7 @@ import { SearchInput } from "@/ui/input";
 import { ListPane, ListPaneScroll } from "@/ui/list";
 import { Note } from "@/ui/note";
 import { Segmented, SegmentedItem } from "@/ui/segmented";
-import { PLACE_PREFIX, useWorldNow, worldParsers } from "../legacy";
+import { PLACE_PREFIX, useWorldNow, worldParsers } from "./world-state";
 import { conversationParsers } from "../chats/open";
 import { askToShowOnMap } from "./map/show-on-map";
 import { PlacePeople } from "./place-people";
@@ -233,7 +233,6 @@ export function WhosWhere({ onNavigated }: { onNavigated?: () => void }) {
                 talkingOnly={talking}
                 selectedId={selectedId}
                 onPick={pick}
-                onNavigated={onNavigated}
               />
             </section>
           ))

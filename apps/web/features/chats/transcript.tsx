@@ -10,10 +10,9 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { toast } from "sonner";
+import { toast } from "@/ui/toast";
 import { useCharacters } from "@/hooks/use-characters";
 import { useSimNow } from "@/hooks/use-clock";
-import { useLongPress } from "@/hooks/use-long-press";
 import type { useParticipantResolver } from "@/hooks/use-participants";
 import { useSelection } from "@/hooks/use-selection";
 import { formatDayLabel, formatTime } from "@/lib/format";
@@ -35,7 +34,8 @@ import type { ChatInfo, PendingMessage } from "@/lib/source/chats/types";
 import { requestInspector } from "@/lib/state/ui-store";
 import { Avatar } from "@/ui/avatar";
 import { Button } from "@/ui/button";
-import { LineActions, type LineAction } from "@/ui/line-actions";
+import { ContextMenu, type ContextAction } from "@/ui/context-menu";
+import { LineActions } from "@/ui/line-actions";
 import {
   Bubble,
   DayMark,
@@ -103,6 +103,7 @@ export function Transcript({
   activity = [],
   activityRunning = false,
   after,
+  onShooting,
   className,
 }: {
   chat: ChatInfo;
@@ -123,6 +124,8 @@ export function Transcript({
   activityRunning?: boolean;
   /** At the end of the conversation, after the last line. */
   after?: ReactNode;
+  /** Choosing a screenshot began or ended: the reply box gives way to its bar. */
+  onShooting?: (shooting: boolean) => void;
   className?: string;
 }) {
   const simNow = useSimNow();
@@ -147,48 +150,65 @@ export function Transcript({
   );
   const pendingById = new Map(pending.map((m) => [m.id, m]));
   const fresh = useArrivals(messages, isLoading, userId);
-  const shot = useScreenshot(chat.id, messages);
-  const [menuFor, setMenuFor] = useState<string | null>(null);
-  const press = useLongPress(setMenuFor);
+  const shot = useScreenshot(chat.id, messages, onShooting);
   const nameOf = (id: string) => resolve(id).name;
+  const byId = new Map<string, DisplayMessage>(
+    [...messages, ...pending].map((message) => [message.id, message]),
+  );
 
+  /**
+   * What can be done with a sent line: beside it on hover, in a sheet on a long
+   * press.
+   */
+  const actionsOf = (message: DisplayMessage): ContextAction[] =>
+    shot.range || pendingById.has(message.id)
+      ? []
+      : [
+          {
+            key: "copy",
+            label: "Copy text",
+            icon: <CopyIcon aria-hidden />,
+            run: () =>
+              void navigator.clipboard.writeText(message.text).then(
+                () => toast.success("Copied"),
+                () =>
+                  toast.error(
+                    "Couldn't copy: the browser blocked the clipboard.",
+                  ),
+              ),
+          },
+          {
+            key: "screenshot",
+            label: "Screenshot",
+            icon: <CropIcon aria-hidden />,
+            run: () => shot.start(message.id),
+          },
+        ];
   const actionsFor = (message: DisplayMessage): ReactNode => {
-    if (shot.range || pendingById.has(message.id)) return null;
-    const actions: LineAction[] = [
-      {
-        label: "Copy text",
-        icon: <CopyIcon aria-hidden />,
-        run: () =>
-          void navigator.clipboard.writeText(message.text).then(
-            () => toast.success("Copied"),
-            () =>
-              toast.error("Couldn't copy: the browser blocked the clipboard."),
-          ),
-      },
-      {
-        label: "Screenshot",
-        icon: <CropIcon aria-hidden />,
-        run: () => shot.start(message.id),
-      },
-    ];
-    return (
+    const actions = actionsOf(message);
+    return actions.length ? (
       <LineActions
-        actions={actions}
-        open={menuFor === message.id}
-        onClose={() => setMenuFor(null)}
+        actions={actions.map(({ label, icon, run }) => ({ label, icon, run }))}
       />
-    );
+    ) : null;
   };
-  /** A sent line: held on touch for its actions, picked while framing a shot. */
+  const resolveLine = (target: EventTarget | null) => {
+    const id = (target as Element | null)
+      ?.closest?.("[data-shot-id]")
+      ?.getAttribute("data-shot-id");
+    const message = id ? byId.get(id) : undefined;
+    if (!message) return undefined;
+    const actions = actionsOf(message);
+    return actions.length
+      ? {
+          title: `${nameOf(message.senderId)}: ${message.text.slice(0, 60)}`,
+          actions,
+        }
+      : undefined;
+  };
+  /** A sent line: picked while framing a shot. */
   const lineProps = (message: DisplayMessage) =>
-    pendingById.has(message.id)
-      ? {}
-      : {
-          ...shot.rowProps(message.id),
-          ...press(message.id),
-          className:
-            "pointer-coarse:select-none pointer-coarse:[-webkit-touch-callout:none]",
-        };
+    pendingById.has(message.id) ? {} : shot.rowProps(message.id);
   const empty = observed ? EMPTY_OBSERVED : EMPTY[chat.type];
 
   return (
@@ -215,182 +235,192 @@ export function Transcript({
           ) : undefined
         }
       >
-        <div
-          className={
-            shot.range
-              ? "relative flex flex-1 flex-col gap-3 select-none **:data-shot-id:cursor-pointer [&_[data-shot-in]:focus-visible]:outline-2 [&_[data-shot-in]:focus-visible]:outline-offset-4 [&_[data-shot-in]:focus-visible]:outline-ui-primary"
-              : "relative flex flex-1 flex-col gap-3"
-          }
-          onClickCapture={shot.onClickCapture}
+        <ContextMenu
+          resolve={resolveLine}
+          label="Message actions"
+          className="flex flex-1 flex-col"
+          innerClassName="flex flex-1 flex-col"
         >
-          {shot.range ? (
-            <ScreenshotFrame
-              ids={shot.ids}
-              range={shot.range}
-              excluded={shot.excluded}
-              onChange={shot.select}
-            />
-          ) : null}
-          {hasMore ? (
-            <div className="flex justify-center">
-              <Button
-                tone="ghost"
-                size="sm"
-                pending={isLoadingOlder}
-                onClick={onLoadOlder}
-              >
-                Load earlier messages
-              </Button>
-            </div>
-          ) : null}
-          {isLoading ? <MessagesLoading /> : null}
-          {error && !isLoading ? <Note>{error.message}</Note> : null}
-          {!isLoading && !error && runs.length === 0 && !after ? (
-            <div className="m-auto flex max-w-80 flex-col items-center gap-2 py-10 text-center">
-              <span className="grid size-12 place-items-center rounded-[1rem] bg-ui-tint text-ui-primary motion-safe:animate-ui-bob [&_svg]:size-5">
-                <SparklesIcon aria-hidden />
-              </span>
-              <p className="text-[0.9375rem] font-extrabold">
-                {empty.title(chat.name)}
-              </p>
-              <p className="text-[0.8125rem] text-pretty text-ui-soft">
-                {empty.body}
-              </p>
-            </div>
-          ) : null}
-
-          {runs.map((run) => {
-            const sender = resolve(run.senderId, run.senderName);
-            const mine = run.senderId === userId;
-            const side = mine ? "end" : "start";
-            const first = run.messages[0];
-            const work =
-              first && "sequence" in first
-                ? before.get(first.sequence)
-                : undefined;
-            const last = run.messages.at(-1);
-            return (
-              <Fragment key={run.key}>
-                {work ? (
-                  <BrainActivityRows activity={work} running={false} />
-                ) : null}
-                {run.dayLabel ? <DayMark>{run.dayLabel}</DayMark> : null}
-                <MessageRun
-                  side={side}
-                  face={
-                    mine || run.isAction ? undefined : (
-                      <SenderFace sender={sender} />
-                    )
-                  }
-                  name={
-                    group && !mine && !run.isAction && !run.introduced
-                      ? sender.name
-                      : undefined
-                  }
+          <div
+            className={
+              shot.range
+                ? "relative flex flex-1 cursor-pointer flex-col gap-3 select-none [&_[data-shot-in]:focus-visible]:outline-2 [&_[data-shot-in]:focus-visible]:outline-offset-4 [&_[data-shot-in]:focus-visible]:outline-ui-primary"
+                : "relative flex flex-1 flex-col gap-3"
+            }
+            onClickCapture={shot.onClickCapture}
+          >
+            {shot.range ? (
+              <ScreenshotFrame
+                ids={shot.ids}
+                range={shot.range}
+                excluded={shot.excluded}
+                onChange={shot.select}
+              />
+            ) : null}
+            {hasMore ? (
+              <div className="flex justify-center">
+                <Button
+                  tone="ghost"
+                  size="sm"
+                  pending={isLoadingOlder}
+                  onClick={onLoadOlder}
                 >
-                  {run.messages.map((message, index) => {
-                    const pend = pendingById.get(message.id);
-                    const enter = fresh(message);
-                    const key = message.requestId ?? message.id;
-                    if (run.isAction) {
-                      const line = actionLine(sender.name, message.text);
+                  Load earlier messages
+                </Button>
+              </div>
+            ) : null}
+            {isLoading ? <MessagesLoading /> : null}
+            {error && !isLoading ? <Note>{error.message}</Note> : null}
+            {!isLoading && !error && runs.length === 0 && !after ? (
+              <div className="m-auto flex max-w-80 flex-col items-center gap-2 py-10 text-center">
+                <span className="grid size-12 place-items-center rounded-[1rem] bg-ui-tint text-ui-primary motion-safe:animate-ui-bob [&_svg]:size-5">
+                  <SparklesIcon aria-hidden />
+                </span>
+                <p className="text-[0.9375rem] font-extrabold">
+                  {empty.title(chat.name)}
+                </p>
+                <p className="text-[0.8125rem] text-pretty text-ui-soft">
+                  {empty.body}
+                </p>
+              </div>
+            ) : null}
+
+            {runs.map((run) => {
+              const sender = resolve(run.senderId, run.senderName);
+              const mine = run.senderId === userId;
+              const side = mine ? "end" : "start";
+              const first = run.messages[0];
+              const work =
+                first && "sequence" in first
+                  ? before.get(first.sequence)
+                  : undefined;
+              const last = run.messages.at(-1);
+              return (
+                <Fragment key={run.key}>
+                  {work ? (
+                    <BrainActivityRows activity={work} running={false} />
+                  ) : null}
+                  {run.dayLabel ? <DayMark>{run.dayLabel}</DayMark> : null}
+                  <MessageRun
+                    side={side}
+                    face={
+                      mine || run.isAction ? undefined : (
+                        <SenderFace sender={sender} />
+                      )
+                    }
+                    name={
+                      group && !mine && !run.isAction && !run.introduced
+                        ? sender.name
+                        : undefined
+                    }
+                  >
+                    {run.messages.map((message, index) => {
+                      const pend = pendingById.get(message.id);
+                      const enter = fresh(message);
+                      const key = message.requestId ?? message.id;
+                      if (run.isAction) {
+                        const line = actionLine(sender.name, message.text);
+                        return (
+                          <Narration
+                            key={key}
+                            side={side}
+                            subject={line.subject}
+                            rest={line.rest}
+                            title={formatTime(message.timestamp)}
+                            failed={pend?.status === "failed"}
+                            sending={pend?.status === "sending"}
+                            enter={enter}
+                            actions={actionsFor(message)}
+                            {...lineProps(message)}
+                          />
+                        );
+                      }
+                      if (message.type === "sticker" && message.sticker) {
+                        return (
+                          <Sticker
+                            key={key}
+                            side={side}
+                            src={message.sticker.url}
+                            alt={message.text}
+                            enter={enter}
+                            actions={actionsFor(message)}
+                            {...lineProps(message)}
+                          />
+                        );
+                      }
                       return (
-                        <Narration
+                        <Bubble
                           key={key}
                           side={side}
-                          subject={line.subject}
-                          rest={line.rest}
-                          title={formatTime(message.timestamp)}
-                          failed={pend?.status === "failed"}
+                          tone={
+                            pend?.status === "failed"
+                              ? "failed"
+                              : mine
+                                ? "mine"
+                                : "theirs"
+                          }
+                          position={positionOf(index, run.messages.length)}
                           sending={pend?.status === "sending"}
                           enter={enter}
                           actions={actionsFor(message)}
                           {...lineProps(message)}
-                        />
+                        >
+                          {message.text}
+                        </Bubble>
                       );
-                    }
-                    if (message.type === "sticker" && message.sticker) {
-                      return (
-                        <Sticker
-                          key={key}
-                          side={side}
-                          src={message.sticker.url}
-                          alt={message.text}
-                          enter={enter}
-                          actions={actionsFor(message)}
-                          {...lineProps(message)}
+                    })}
+                    {/* Something done is timed on hover; only your own says it landed. */}
+                    {last && (!run.isAction || mine) ? (
+                      <MessageFoot>
+                        <Status
+                          message={last}
+                          pending={pendingById.get(last.id)}
+                          onRetry={onRetry}
+                          nameOf={mine ? nameOf : undefined}
+                          inPerson={inPerson}
                         />
-                      );
+                      </MessageFoot>
+                    ) : null}
+                  </MessageRun>
+                </Fragment>
+              );
+            })}
+
+            {trailing.map((a) => (
+              <BrainActivityRows
+                key={a.key}
+                activity={a}
+                running={activityRunning}
+              />
+            ))}
+            {activityRunning ? <BrainThinking /> : null}
+
+            {typists.map((typist) => {
+              const sender = resolve(typist.senderId, typist.senderName);
+              return (
+                <MessageRun
+                  key={`typing-${typist.senderId}`}
+                  side="start"
+                  face={<SenderFace sender={sender} />}
+                  name={group ? sender.name : undefined}
+                >
+                  <TypingBubble
+                    label={
+                      typist.mode === "speaking"
+                        ? `${sender.name} is speaking`
+                        : `${sender.name} is typing`
                     }
-                    return (
-                      <Bubble
-                        key={key}
-                        side={side}
-                        tone={
-                          pend?.status === "failed"
-                            ? "failed"
-                            : mine
-                              ? "mine"
-                              : "theirs"
-                        }
-                        position={positionOf(index, run.messages.length)}
-                        sending={pend?.status === "sending"}
-                        enter={enter}
-                        actions={actionsFor(message)}
-                        {...lineProps(message)}
-                      >
-                        {message.text}
-                      </Bubble>
-                    );
-                  })}
-                  {/* Something done is timed on hover; only your own says it landed. */}
-                  {last && (!run.isAction || mine) ? (
-                    <MessageFoot>
-                      <Status
-                        message={last}
-                        pending={pendingById.get(last.id)}
-                        onRetry={onRetry}
-                        nameOf={mine ? nameOf : undefined}
-                        inPerson={inPerson}
-                      />
-                    </MessageFoot>
-                  ) : null}
+                  />
+                  <MessageFoot>{null}</MessageFoot>
                 </MessageRun>
-              </Fragment>
-            );
-          })}
-
-          {trailing.map((a) => (
-            <BrainActivityRows
-              key={a.key}
-              activity={a}
-              running={activityRunning}
-            />
-          ))}
-          {activityRunning ? <BrainThinking /> : null}
-
-          {typists.map((typist) => {
-            const sender = resolve(typist.senderId, typist.senderName);
-            return (
-              <MessageRun
-                key={`typing-${typist.senderId}`}
-                side="start"
-                face={<SenderFace sender={sender} />}
-                name={group ? sender.name : undefined}
-              >
-                <TypingBubble
-                  label={
-                    typist.mode === "speaking"
-                      ? `${sender.name} is speaking`
-                      : `${sender.name} is typing`
-                  }
-                />
-                <MessageFoot>{null}</MessageFoot>
-              </MessageRun>
-            );
-          })}
-          {after}
-        </div>
+              );
+            })}
+            {after}
+            {shot.range ? (
+              <div aria-hidden className="h-12 shrink-0 sm:h-14" />
+            ) : null}
+          </div>
+        </ContextMenu>
       </ScrollLog>
       <ScreenshotDialog
         open={Boolean(shot.range) && shot.exporting}
@@ -437,10 +467,29 @@ function useArrivals(
 }
 
 /**
+ * The message on the row at `y`, anywhere across it (beside a bubble, on its
+ * time, on the name above a run): the nearest line within a little way.
+ */
+function rowAt(content: HTMLElement, y: number): string | undefined {
+  let best: { id: string; distance: number } | undefined;
+  for (const line of content.querySelectorAll<HTMLElement>("[data-shot-id]")) {
+    const { top, bottom } = line.getBoundingClientRect();
+    const distance = y < top ? top - y : y > bottom ? y - bottom : 0;
+    if (!best || distance < best.distance)
+      best = { id: line.dataset.shotId ?? "", distance };
+  }
+  return best && best.distance <= 28 ? best.id : undefined;
+}
+
+/**
  * A crop over the sent messages, kept by id so it survives older pages loading
  * above it and belongs to the chat it was made in.
  */
-function useScreenshot(chatId: string, messages: readonly ChatMessage[]) {
+function useScreenshot(
+  chatId: string,
+  messages: readonly ChatMessage[],
+  onShooting?: (shooting: boolean) => void,
+) {
   const [shot, setShot] = useState<{
     chatId: string;
     startId: string;
@@ -473,6 +522,7 @@ function useScreenshot(chatId: string, messages: readonly ChatMessage[]) {
   const stop = () => {
     setShot(null);
     setExporting(false);
+    onShooting?.(false);
   };
   const pick = (id: string) => {
     const index = indexOf(id);
@@ -484,13 +534,20 @@ function useScreenshot(chatId: string, messages: readonly ChatMessage[]) {
 
   const shooting = range !== undefined;
   useEffect(() => {
+    onShooting?.(shooting);
+  }, [shooting, onShooting]);
+
+  useEffect(() => {
     if (!shooting || exporting) return;
     const leave = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setShot(null);
+      if (event.key === "Escape") {
+        setShot(null);
+        onShooting?.(false);
+      }
     };
     window.addEventListener("keydown", leave);
     return () => window.removeEventListener("keydown", leave);
-  }, [shooting, exporting]);
+  }, [shooting, exporting, onShooting]);
 
   return {
     ids,
@@ -506,13 +563,16 @@ function useScreenshot(chatId: string, messages: readonly ChatMessage[]) {
       if (index === -1) return;
       setExcluded(new Set());
       select({ start: index, end: index });
+      onShooting?.(true);
     },
     /** While framing, a click on a message changes the picture and nothing else. */
     onClickCapture: (event: React.MouseEvent) => {
       if (!range) return;
-      const id = (event.target as Element)
-        .closest("[data-shot-id]")
-        ?.getAttribute("data-shot-id");
+      const id =
+        (event.target as Element)
+          .closest("[data-shot-id]")
+          ?.getAttribute("data-shot-id") ??
+        rowAt(event.currentTarget as HTMLElement, event.clientY);
       if (!id) return;
       event.preventDefault();
       event.stopPropagation();

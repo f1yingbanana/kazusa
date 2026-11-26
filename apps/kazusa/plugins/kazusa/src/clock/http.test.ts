@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
-import { registerClockHttp } from "./http.ts";
+import { registerClockHttp, worldConfigOf } from "./http.ts";
 import { Clock } from "./clock.ts";
 
 function createMockStore() {
@@ -12,6 +12,30 @@ function createMockStore() {
     }),
   };
 }
+
+describe("worldConfigOf", () => {
+  it("passes this install's note to visitors through", () => {
+    const note = {
+      title: "Talk to them",
+      text: "On Discord you can text one student at a time.",
+      link: { label: "Join the Discord", href: "https://discord.gg/abc" },
+    };
+    expect(worldConfigOf({ title: "Kivotos", visitorNote: note })).toEqual({
+      title: "Kivotos",
+      visitorNote: note,
+    });
+  });
+
+  it("leaves out a malformed note and keeps the rest", () => {
+    expect(
+      worldConfigOf({
+        title: "Kivotos",
+        visitorNote: { link: { label: "x", href: "javascript:alert(1)" } },
+      }),
+    ).toEqual({ title: "Kivotos" });
+    expect(worldConfigOf(undefined)).toEqual({});
+  });
+});
 
 describe("registerClockHttp", () => {
   it("registers GET /kazusa/world and POST /kazusa/clock routes", async () => {

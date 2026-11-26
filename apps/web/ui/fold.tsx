@@ -22,21 +22,39 @@ export function Folds({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * `icon` leads the title, for folds sitting among list rows: it takes the rows'
+ * inset too, so titles and separators line up with theirs.
+ */
 export function Fold({
   value,
   title,
   summary,
+  icon,
   children,
 }: {
   value: string;
   title: string;
   summary?: ReactNode;
+  icon?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <AccordionItem value={value} className="border-t border-ui-line">
+    <AccordionItem
+      value={value}
+      data-inset={icon ? "" : undefined}
+      className="group/item border-t border-ui-line"
+    >
       <AccordionHeader className="m-0">
-        <AccordionTrigger className="group/fold flex min-h-11 w-full items-center gap-2 rounded-[0.5rem] px-1 text-start focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ui-primary">
+        <AccordionTrigger className="group/fold flex min-h-11 w-full items-center gap-2 rounded-[0.5rem] px-1 text-start group-data-inset/item:min-h-12 group-data-inset/item:gap-3 group-data-inset/item:px-3 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ui-primary">
+          {icon ? (
+            <span
+              aria-hidden
+              className="grid size-7 shrink-0 place-items-center text-ui-soft [&_svg]:size-4.5"
+            >
+              {icon}
+            </span>
+          ) : null}
           <span className="shrink-0 text-sm font-extrabold group-hover/fold:text-ui-primary">
             {title}
           </span>
@@ -49,8 +67,8 @@ export function Fold({
           />
         </AccordionTrigger>
       </AccordionHeader>
-      <AccordionPanel className="px-1 pb-3 text-[0.8125rem]">
-        {children}
+      <AccordionPanel className="h-(--accordion-panel-height) overflow-hidden text-[0.8125rem] transition-[height] duration-200 ease-out data-ending-style:h-0 data-starting-style:h-0 motion-reduce:transition-none">
+        <div className="px-1 pb-3 group-data-inset/item:px-3">{children}</div>
       </AccordionPanel>
     </AccordionItem>
   );

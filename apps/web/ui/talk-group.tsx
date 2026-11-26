@@ -74,7 +74,7 @@ export function TalkGroup({
         )}
         <ChevronRightIcon
           aria-hidden
-          className="mt-px size-4 shrink-0 text-ui-soft opacity-0 transition-opacity duration-150 group-hover/line:opacity-100 group-focus-visible/line:opacity-100 rtl:rotate-180"
+          className="mt-px size-4 shrink-0 text-ui-soft opacity-0 transition-opacity duration-150 group-hover/line:opacity-100 group-focus-visible/line:opacity-100 max-md:opacity-75 rtl:rotate-180 [@media(hover:none)]:opacity-75"
         />
       </button>
     </div>

@@ -230,7 +230,7 @@ export function ChatDetail({
 
       {type !== "direct" ? (
         <DetailSection
-          title="People"
+          title="Characters"
           meta={members.length || undefined}
           action={
             own && canAdd ? (

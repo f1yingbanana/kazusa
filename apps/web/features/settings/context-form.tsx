@@ -6,7 +6,7 @@ import type {
   ContextSettingsResponse,
 } from "@kazusa/client";
 import { useMemo, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/ui/toast";
 import { z } from "zod";
 import { Button } from "@/ui/button";
 import { NumberField } from "@/ui/field";
@@ -40,7 +40,7 @@ const FormSchema = z
     memoryLimit: z.number().nullable(),
     toolHistoryTokens: whole(0, 32_000, "tokens"),
     onYourMindTokens: whole(0, 32_000, "tokens"),
-    peopleLimit: whole(0, 200, "people"),
+    peopleLimit: whole(0, 200, "characters"),
     placesLimit: whole(0, 50, "places"),
     ledgerGridHours: whole(1, 24, "hours"),
     ledgerTrimPercent: whole(10, 100, "percent"),
@@ -106,7 +106,7 @@ export const SETTING_LABELS: Record<SettingKey, string> = {
   ledgerMaxTokens: "Memory size",
   toolHistoryTokens: "Tool calls",
   onYourMindTokens: "Wiki memories",
-  peopleLimit: "People",
+  peopleLimit: "Characters",
   placesLimit: "Places",
   ledgerGridHours: "Granularity",
   ledgerTrimTo: "Slack",
@@ -138,7 +138,7 @@ const NUMBERS: Record<
       "Room reserved for relevant wiki notes about people, places, and things.",
   },
   peopleLimit: {
-    unit: "people",
+    unit: "characters",
     min: 0,
     max: 200,
     description: "Maximum familiar people listed each turn.",

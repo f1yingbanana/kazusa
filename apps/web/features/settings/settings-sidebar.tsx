@@ -2,7 +2,7 @@
 
 import { useQueryState } from "nuqs";
 import { useAccess } from "@/hooks/use-access";
-import type { SectionSidebarProps } from "@/lib/registry/types";
+import type { SectionSidebarProps } from "../shell/sections";
 import {
   ListPane,
   ListPaneScroll,

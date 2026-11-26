@@ -3,7 +3,7 @@
 import type { ModelProviderStatus, ProviderSummary } from "@kazusa/client";
 import { ArrowUpRightIcon, EllipsisIcon, RefreshCwIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/ui/toast";
 import { useDecisionModels, useEmbeddingModels } from "@/hooks/use-model-roles";
 import { useModels } from "@/hooks/use-models";
 import { useProviders } from "@/hooks/use-providers";

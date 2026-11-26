@@ -34,10 +34,12 @@ function byOutfit<T extends WikiPicture>(pictures: readonly T[]) {
 export function LooksTab({
   character,
   editing = false,
+  onClose,
 }: {
   character: CharacterSummary;
   /** Opened to be changed, by whoever runs the world. */
   editing?: boolean;
+  onClose?: () => void;
 }) {
   const { data, error, isLoading, mutate } = useWikiCharacter(character.id);
   const { data: set } = usePortraits(character.id);
@@ -53,7 +55,13 @@ export function LooksTab({
   if (isLoading) return <Note>{`Fetching ${called}'s pictures…`}</Note>;
   if (error || !data) return <Note>{"Couldn't read their pictures."}</Note>;
   if (editing)
-    return <LooksEditor character={data} onChanged={() => mutate()} />;
+    return (
+      <LooksEditor
+        character={data}
+        onChanged={() => mutate()}
+        onClose={() => onClose?.()}
+      />
+    );
   if (!data.portraits.length && !data.stickers.length)
     return <Note>{`${called} has no portraits or stickers yet.`}</Note>;
 

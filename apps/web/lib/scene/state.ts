@@ -67,11 +67,6 @@ export interface SceneLine {
    * for lines read from history and for lines still `ahead`.
    */
   readonly shownAt?: number;
-  /**
-   * Wall-clock ms when it left the panel for the echoes, when known (absent for
-   * history), so an echo can fade a while after it was pushed up.
-   */
-  readonly leftAt?: number;
 }
 
 /** A line being said: its words and its sim-time window. */
@@ -115,12 +110,6 @@ export interface SceneState {
    * `undefined` before anything is said.
    */
   readonly line: SceneLine | undefined;
-  /**
-   * What was just said: the lines that left the panel, oldest first, at most
-   * `MAX_ECHOES`. A line still being said that was pushed up goes on being
-   * revealed here, and commits here.
-   */
-  readonly echoes: readonly SceneLine[];
   /**
    * Who is saying which line now, from speaking events that carry it, in the
    * order they started; gone when the line commits or the saying stops.

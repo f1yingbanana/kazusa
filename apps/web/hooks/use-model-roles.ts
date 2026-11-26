@@ -2,7 +2,7 @@
 
 import { useCallback } from "react";
 import useSWR from "swr";
-import { toast } from "sonner";
+import { toast } from "@/ui/toast";
 import type {
   DecisionModelsResponse,
   EmbeddingModelsResponse,

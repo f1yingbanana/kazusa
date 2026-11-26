@@ -2,7 +2,7 @@
 
 import { isRunning } from "@kazusa/client";
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/ui/toast";
 import { useSaves } from "@/hooks/use-saves";
 import { useWorldUpdate } from "@/hooks/use-world-update";
 import { closeUpdateSaveDialog, useUiStore } from "@/lib/state/ui-store";
@@ -62,7 +62,7 @@ export function UpdateSaveDialog() {
       toast.error("Couldn't save before the update", {
         description: request.error,
         duration: 30_000,
-        action: { label: `Ask ${admin} anyway`, onClick: () => void askNow() },
+        action: { label: `Ask ${admin} anyway`, onAction: () => void askNow() },
       });
     // Once per save: `askNow` and the name change identity, not meaning.
   }, [request, update]);

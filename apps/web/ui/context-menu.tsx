@@ -5,9 +5,9 @@ import {
   useEffect,
   useRef,
   useState,
-  useSyncExternalStore,
   type ReactNode,
 } from "react";
+import { TextButton } from "./button";
 import { cx } from "./cx";
 import { Drawer, DrawerPanel } from "./drawer";
 import {
@@ -17,24 +17,10 @@ import {
   MenuItem,
   MenuSeparator,
 } from "./menu";
+import { useCoarsePointer } from "./pointer";
 
 const LONG_PRESS_MS = 450;
 const PRESS_SLOP_PX = 8;
-const COARSE_POINTER = "(pointer: coarse)";
-
-const subscribeTouch = (listener: () => void) => {
-  const media = window.matchMedia(COARSE_POINTER);
-  media.addEventListener("change", listener);
-  return () => media.removeEventListener("change", listener);
-};
-
-function useCoarsePointer() {
-  return useSyncExternalStore(
-    subscribeTouch,
-    () => window.matchMedia(COARSE_POINTER).matches,
-    () => false,
-  );
-}
 
 export interface ContextAction {
   readonly key: string;
@@ -64,6 +50,7 @@ export function ContextMenu({
   label,
   actions,
   className,
+  innerClassName,
   children,
 }: {
   resolve?: (target: EventTarget | null) => ContextMenuTarget | undefined;
@@ -71,6 +58,8 @@ export function ContextMenu({
   label?: string | undefined;
   actions?: readonly ContextAction[] | undefined;
   className?: string;
+  /** For the element right around `children`, when they need a layout kept. */
+  innerClassName?: string;
   children?: ReactNode;
 }) {
   const touch = useCoarsePointer();
@@ -191,7 +180,10 @@ export function ContextMenu({
       }}
     >
       <Menu>
-        <MenuContextTrigger render={<div />} disabled={touch}>
+        <MenuContextTrigger
+          render={<div className={innerClassName} />}
+          disabled={touch}
+        >
           {children}
         </MenuContextTrigger>
         <MenuContent compact aria-label={current?.title || label || "Actions"}>
@@ -230,8 +222,7 @@ export function ContextMenu({
                     "mt-1 border-t border-ui-line pt-1",
                 )}
               >
-                <button
-                  type="button"
+                <TextButton
                   disabled={action.disabled}
                   onClick={() => {
                     setSheet(false);
@@ -244,7 +235,7 @@ export function ContextMenu({
                 >
                   {action.icon}
                   {action.label}
-                </button>
+                </TextButton>
               </li>
             ))}
           </ul>

@@ -2,7 +2,7 @@
 
 import { useCallback } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { toast } from "sonner";
+import { toast } from "@/ui/toast";
 import { updateStatuses, useLiveStore } from "@/lib/live/state";
 import { useAccess } from "@/hooks/use-access";
 import { useSources } from "@/lib/source/provider";

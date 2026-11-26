@@ -3,7 +3,7 @@
 import type { EmbeddingModelOption, RoleModelOption } from "@kazusa/client";
 import { FolderOpenIcon } from "lucide-react";
 import { useState, type ReactNode } from "react";
-import { toast } from "sonner";
+import { toast } from "@/ui/toast";
 import { useAccess } from "@/hooks/use-access";
 import { useDecisionModels, useEmbeddingModels } from "@/hooks/use-model-roles";
 import { useModels } from "@/hooks/use-models";
@@ -192,7 +192,7 @@ export function ModelSettings() {
   return (
     <SettingsPage
       title="Models"
-      description="Choose the AI models that power your characters and connect provider API keys."
+      description="Models for your characters and provider API keys."
     >
       {!enabled ? (
         <>

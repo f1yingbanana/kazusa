@@ -79,6 +79,16 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
+vi.mock("@/ui/toast", () => ({
+  toast: Object.assign(vi.fn(), {
+    success: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    warning: vi.fn(),
+    dismiss: vi.fn(),
+  }),
+}));
+
 vi.mock("@/hooks/use-access", () => ({
   useAccess: () => mocks.access,
 }));
@@ -361,6 +371,7 @@ vi.mock("@/hooks/use-brain", () => ({
 }));
 
 vi.mock("@/hooks/use-characters", () => ({
+  useCast: () => [],
   useCharacter: (id?: string) =>
     id ? { id, name: "Hoshino", kind: "character" } : undefined,
   useCharacters: () => ({
@@ -546,14 +557,22 @@ describe("AppearanceSettings and TopBar", () => {
   });
 
   it("removes the theme toggle from TopBar", () => {
+    window.matchMedia ??= () =>
+      ({
+        matches: true,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      }) as unknown as MediaQueryList;
     render(
       createElement(TopBar, {
         onOpenCommand: vi.fn(),
-        onOpenSettings: vi.fn(),
+        onOpenDetails: vi.fn(),
       }),
     );
     expect(screen.queryByRole("button", { name: "Palette" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Search or jump" })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Search anything" }),
+    ).toBeTruthy();
   });
 });
 
@@ -662,7 +681,7 @@ describe("ProfileSettings and ContextSettings", () => {
     expect(labels).toContain("Use the model's whole window");
     expect(labels).toContain("Maximum context");
     expect(labels).toContain("Memory window");
-    expect(labels).toContain("People");
+    expect(labels).toContain("Characters");
 
     const result = await agent.act({
       steps: [
@@ -671,7 +690,7 @@ describe("ProfileSettings and ContextSettings", () => {
           action: "setChecked",
           args: [true],
         },
-        { ref: "People", action: "setValue", args: [25] },
+        { ref: "Characters", action: "setValue", args: [25] },
         { ref: "Save changes", action: "press" },
       ],
     });
@@ -687,7 +706,7 @@ describe("ProfileSettings and ContextSettings", () => {
     render(wrapSWR(createElement(ContextSettings)));
     let result = await agent.act({
       steps: [
-        { ref: "People", action: "setValue", args: [null] },
+        { ref: "Characters", action: "setValue", args: [null] },
         { ref: "Save changes", action: "press" },
       ],
     });
@@ -697,7 +716,7 @@ describe("ProfileSettings and ContextSettings", () => {
 
     result = await agent.act({
       steps: [
-        { ref: "People", action: "setValue", args: [20] },
+        { ref: "Characters", action: "setValue", args: [20] },
         { ref: "Maximum context", action: "setValue", args: [null] },
         {
           ref: "Use the model's whole window",

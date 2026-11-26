@@ -429,11 +429,26 @@ export const ClockStateSchema = z.object({
 });
 export type ClockState = z.infer<typeof ClockStateSchema>;
 
+/**
+ * A word for visitors to one install of a world, like where to talk to its
+ * characters: set in that install's own config (`world.visitorNote`), so the
+ * world's template, and every world made from it, never carries it.
+ */
+export const VisitorNoteSchema = z.object({
+  title: z.string().min(1).optional(),
+  text: z.string().min(1),
+  link: z
+    .object({ label: z.string().min(1), href: z.url({ protocol: /^https?$/ }) })
+    .optional(),
+});
+export type VisitorNote = z.infer<typeof VisitorNoteSchema>;
+
 export const WorldMetaSchema = z.object({
   title: z.string(),
   summary: z.string().optional(),
   /** Hex color from `shared/wiki/world.md` frontmatter. */
   accent: z.string().optional(),
+  visitorNote: VisitorNoteSchema.optional(),
   /**
    * Who made the world and where it lives, from the world's npm-style
    * `package.json` (`displayName` or `name`, `version`, `author`'s name,

@@ -188,7 +188,7 @@ export function UsageSettings() {
     return (
       <SettingsPage
         title="Usage"
-        description="Token counts and estimated cost across all characters and models."
+        description="All model calls by real day. Costs are estimates."
       >
         <Unavailable requires={["usage"]} title="Usage needs a live Gateway" />
       </SettingsPage>
@@ -202,22 +202,24 @@ export function UsageSettings() {
   return (
     <SettingsPage
       title="Usage"
-      description="Every model call in this world, attention decisions included, in real days. Costs are estimates, not your provider's bill."
-      action={
-        <Segmented
-          aria-label="Date range"
-          value={days}
-          onValueChange={(next) => next && setDays(next)}
-        >
-          {RANGES.map((range) => (
-            <SegmentedItem key={range.days} value={range.days}>
-              {range.label}
-            </SegmentedItem>
-          ))}
-        </Segmented>
-      }
+      description="All model calls by real day. Costs are estimates."
     >
-      <SettingsSection title="Tokens used">
+      <SettingsSection
+        title="Tokens used"
+        action={
+          <Segmented
+            aria-label="Date range"
+            value={days}
+            onValueChange={(next) => next && setDays(next)}
+          >
+            {RANGES.map((range) => (
+              <SegmentedItem key={range.days} value={range.days}>
+                {range.label}
+              </SegmentedItem>
+            ))}
+          </Segmented>
+        }
+      >
         {error && !report ? (
           <Callout tone="danger" title="Couldn't read usage">
             {error.message}

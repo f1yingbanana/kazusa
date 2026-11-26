@@ -2,9 +2,11 @@
 
 import type { CharacterSummary } from "@kazusa/client";
 import { parseAsString, useQueryStates } from "nuqs";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useCharacters } from "@/hooks/use-characters";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { Note } from "@/ui/note";
+import { slide } from "../shell/slide";
 import { wikiParsers, type PagePart } from "../wiki/search-params";
 import { WorldPage } from "../wiki/world-page";
 import { clearGalleryFocus, rememberGalleryFocus } from "./cast";
@@ -30,6 +32,16 @@ export function CharactersStage() {
     },
   );
   const { byId, isLoading } = useCharacters();
+  const docked = useMediaQuery("(min-width: 1024px)");
+  const [pendingId, setPendingId] = useState<string | null | undefined>(
+    undefined,
+  );
+  const [prevId, setPrevId] = useState(id);
+  if (prevId !== id) {
+    setPrevId(id);
+    if (pendingId !== undefined) setPendingId(undefined);
+  }
+  const shownId = pendingId !== undefined ? pendingId : id;
   useEffect(() => () => clearGalleryFocus(), []);
   useEffect(() => {
     if (!legacyTab) return;
@@ -43,18 +55,47 @@ export function CharactersStage() {
       { history: "replace" },
     );
   }, [legacyTab, setParams]);
-  const character = id ? byId.get(id) : undefined;
-  if (!id) return <Gallery />;
+  const character = shownId ? byId.get(shownId) : undefined;
+
+  const openCharacter = (targetId: string, navigate: () => void) => {
+    if (docked) {
+      navigate();
+      return;
+    }
+    slide("forward", () => {
+      setPendingId(targetId);
+      navigate();
+    });
+  };
+
+  const leaveCharacter = (leave: () => void) => {
+    if (docked) {
+      leave();
+      return;
+    }
+    slide("back", () => {
+      setPendingId(null);
+      leave();
+    });
+  };
+
+  if (!shownId) return <Gallery onOpen={openCharacter} />;
   if (!character)
     return (
       <Note inset="panel">
-        {isLoading ? "Finding them…" : `No one called “${id}” was found.`}
+        {isLoading ? "Finding them…" : `No one called “${shownId}” was found.`}
       </Note>
     );
-  return <CharacterPage character={character} />;
+  return <CharacterPage character={character} onBack={leaveCharacter} />;
 }
 
-function CharacterPage({ character }: { character: CharacterSummary }) {
+function CharacterPage({
+  character,
+  onBack,
+}: {
+  character: CharacterSummary;
+  onBack: (leave: () => void) => void;
+}) {
   useEffect(() => {
     rememberGalleryFocus(character.id);
   }, [character.id]);
@@ -63,7 +104,7 @@ function CharacterPage({ character }: { character: CharacterSummary }) {
     <WorldPage
       key={character.id}
       id={character.id}
-      castNav={<CastNav id={character.id} />}
+      castNav={<CastNav id={character.id} onBack={onBack} />}
     />
   );
 }

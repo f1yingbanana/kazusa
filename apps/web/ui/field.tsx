@@ -20,6 +20,7 @@ import {
   PasswordInputToggle,
 } from "@ui-sdk/react/password-input";
 import { Textarea } from "@ui-sdk/react/textarea";
+import { TimeInput, TimeInputSegment } from "@ui-sdk/react/time-input";
 import { EyeIcon, EyeOffIcon, MinusIcon, PlusIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 import { cx } from "./cx";
@@ -335,6 +336,49 @@ export function NumberField({
       <FieldHeader label={label} action={action} />
       {input}
       <FieldFooter description={description} error={error} />
+    </Field>
+  );
+}
+
+/**
+ * A time of day, typed a part at a time on a 24-hour clock: the sim's clock
+ * reads that way whatever the viewer's own uses. `after` sits beside the input,
+ * like the day it falls on.
+ */
+export function TimeField({
+  label,
+  value,
+  onValueChange,
+  after,
+  disabled,
+}: {
+  label: string;
+  value: string | null;
+  onValueChange: (value: string | null) => void;
+  after?: ReactNode;
+  disabled?: boolean;
+}) {
+  return (
+    <Field className="flex items-center gap-2.5">
+      <FieldLabel className="text-sm font-bold">{label}</FieldLabel>
+      <TimeInput
+        value={value}
+        onValueChange={(next) => onValueChange(next)}
+        hourCycle={24}
+        disabled={disabled}
+        className="inline-flex h-9 items-center rounded-[0.875rem] bg-ui-ground px-2.5 text-sm font-bold text-ui-ink tabular-nums inset-ring inset-ring-ui-line focus-within:inset-ring-2 focus-within:inset-ring-ui-primary data-disabled:opacity-60"
+      >
+        {({ segments }) =>
+          segments.map((segment) => (
+            <TimeInputSegment
+              key={segment.key}
+              segment={segment}
+              className="w-[2ch] rounded-[0.3rem] bg-transparent text-center outline-none focus:bg-ui-primary focus:text-ui-on-primary data-empty:text-ui-soft data-[type=literal]:w-auto"
+            />
+          ))
+        }
+      </TimeInput>
+      {after ? <span className="text-xs text-ui-soft">{after}</span> : null}
     </Field>
   );
 }

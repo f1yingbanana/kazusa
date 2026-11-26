@@ -11,7 +11,6 @@ import {
   syncSceneMembers,
   useSceneBehind,
   useSceneFigures,
-  useSceneEchoes,
   useSceneLine,
   useSceneNextShowAt,
   useSceneOpen,
@@ -123,16 +122,11 @@ describe("scene store", () => {
     });
     renderHook(() => {
       renders.oneLines++;
-      return [useSceneLine("one"), useSceneEchoes("one")];
+      return useSceneLine("one");
     });
     renderHook(() => {
       renders.two++;
-      return [
-        useSceneFigures("two"),
-        useSceneLine("two"),
-        useSceneEchoes("two"),
-        useSceneOpen("two"),
-      ];
+      return [useSceneFigures("two"), useSceneLine("two"), useSceneOpen("two")];
     });
     renderHook(() => {
       renders.behind++;

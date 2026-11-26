@@ -4,7 +4,7 @@ import { BookOpenIcon, ListIcon, Minimize2Icon } from "lucide-react";
 import { EXIT_ATTRIBUTE } from "@/hooks/use-scene-fullscreen";
 import { cx } from "@/ui/cx";
 import { Toolbar, ToolbarIconButton } from "@/ui/toolbar";
-import { Clock } from "../../shell/clock";
+import { Clock } from "../../shell/clock/clock";
 
 /** What reading mode does, in plain words, for its tooltip. */
 export const READING_HINT =

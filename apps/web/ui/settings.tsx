@@ -4,33 +4,32 @@ import { Button as BaseButton } from "@ui-sdk/react/button";
 import type { ComponentProps, ReactNode } from "react";
 import { Button } from "./button";
 import { cx } from "./cx";
+import { PaneBackButton } from "./pane-nav";
 
 export function SettingsPage({
   title,
   description,
-  action,
   children,
 }: {
   title: string;
   description?: string;
-  action?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <header className="flex shrink-0 items-center justify-between gap-4 border-b border-ui-line px-6 py-4 max-sm:px-4">
-        <div className="flex min-w-0 flex-col gap-0.5">
-          <h1 className="text-lg font-extrabold tracking-[-0.01em] text-ui-ink">
-            {title}
-          </h1>
-          {description ? (
-            <p className="text-[0.8125rem] text-ui-soft">{description}</p>
-          ) : null}
-        </div>
-        {action ? <div className="shrink-0">{action}</div> : null}
+      <header className="flex h-14 shrink-0 items-center gap-2 border-b border-ui-line px-6 max-sm:px-3.5">
+        <PaneBackButton />
+        <h1 className="min-w-0 flex-1 truncate text-base font-extrabold tracking-[-0.01em] text-ui-ink">
+          {title}
+        </h1>
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto p-6 max-sm:px-4">
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-7">
+          {description ? (
+            <p className="-mb-2 text-sm leading-relaxed text-pretty text-ui-soft">
+              {description}
+            </p>
+          ) : null}
           {children}
         </div>
       </div>
@@ -56,12 +55,12 @@ export function SettingsSection({
     <section
       aria-label={title}
       className={cx(
-        "flex flex-col gap-4 border-t border-ui-line pt-7 first:border-t-0 first:pt-0",
+        "flex flex-col gap-4 border-t border-ui-line pt-7 first-of-type:border-t-0 first-of-type:pt-0",
         className,
       )}
     >
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex min-w-0 flex-col gap-1">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
           <h2 className="text-[0.9375rem] font-extrabold text-ui-ink">
             {title}
           </h2>

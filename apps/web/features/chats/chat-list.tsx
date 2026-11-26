@@ -35,8 +35,9 @@ import { EmptySeats } from "@/ui/empty-seats";
 import { Note } from "@/ui/note";
 import { NO_FAVORITES } from "../characters/favorites";
 import { Segmented, SegmentedItem } from "@/ui/segmented";
+import { chatIcon } from "../entities/chat-meta";
 import { CharacterAvatar } from "../characters/character-avatar";
-import { chatsParsers } from "../legacy";
+import { chatsParsers } from "./search-params";
 import { NewChat } from "./new-chat";
 import { conversationParsers, conversationPatch } from "./open";
 
@@ -290,22 +291,29 @@ function ChatRow({
   const preview = last
     ? messagePreview(last, chat, self, (id) => byId.get(id)?.name ?? "")
     : "No messages yet";
+  const ChatTypeIcon = chatIcon(chat.type);
   return (
     <ListRow
       current={current}
       onClick={onOpen}
       leading={
-        <AvatarStack>
-          {faces.map((c) => (
-            <CharacterAvatar
-              key={c.id}
-              id={c.id}
-              name={c.name}
-              avatarUrl={c.avatarUrl}
-              kind={c.kind}
-            />
-          ))}
-        </AvatarStack>
+        faces.length > 0 ? (
+          <AvatarStack>
+            {faces.map((c) => (
+              <CharacterAvatar
+                key={c.id}
+                id={c.id}
+                name={c.name}
+                avatarUrl={c.avatarUrl}
+                kind={c.kind}
+              />
+            ))}
+          </AvatarStack>
+        ) : (
+          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-ui-tint text-ui-soft [&_svg]:size-4.5">
+            <ChatTypeIcon aria-hidden />
+          </span>
+        )
       }
       title={
         <span className="flex items-baseline gap-2">

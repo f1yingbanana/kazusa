@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo } from "react";
 import type { LocationRecord } from "@kazusa/client";
-import { toast } from "sonner";
+import { toast } from "@/ui/toast";
 import { useCharacterStatus } from "@/hooks/use-characters";
 import { useSimNow } from "@/hooks/use-clock";
 import { useOffstage } from "@/hooks/use-stage";

@@ -17,7 +17,7 @@ import { useAccess } from "@/hooks/use-access";
 import { useCharacters } from "@/hooks/use-characters";
 import { useSelection } from "@/hooks/use-selection";
 import { usePageName, useWikiList } from "@/hooks/use-wiki";
-import type { SectionSidebarProps } from "@/lib/registry/types";
+import type { SectionSidebarProps } from "../shell/sections";
 import {
   buildIndex,
   isShelfValue,
@@ -64,7 +64,7 @@ const SHELF_KIND: Readonly<Partial<Record<Shelf, NewKind>>> = {
 
 const NEW_WORD: Readonly<Record<NewKind, string>> = {
   place: "New place",
-  person: "New person",
+  person: "New character",
   group: "New group",
   concept: "New concept",
 };

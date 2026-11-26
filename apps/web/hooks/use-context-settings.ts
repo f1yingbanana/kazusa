@@ -2,7 +2,7 @@
 
 import { useCallback } from "react";
 import useSWR, { useSWRConfig } from "swr";
-import { toast } from "sonner";
+import { toast } from "@/ui/toast";
 import type { ContextOverrides, ContextSettingsResponse } from "@kazusa/client";
 import {
   CONTEXT_SETTINGS_KEY,

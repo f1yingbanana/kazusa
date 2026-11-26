@@ -487,7 +487,26 @@
         "properties": {
           "title": { "type": "string" },
           "summary": { "type": "string" },
-          "accent": { "type": "string" }
+          "accent": { "type": "string" },
+          "visitorNote": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "Shown to visitors of this install only, in the welcome they get on arriving, like where they can talk to the characters. Set it in this world's own openclaw.json, never in its template.",
+            "required": ["text"],
+            "properties": {
+              "title": { "type": "string", "minLength": 1 },
+              "text": { "type": "string", "minLength": 1 },
+              "link": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["label", "href"],
+                "properties": {
+                  "label": { "type": "string", "minLength": 1 },
+                  "href": { "type": "string", "pattern": "^https?://" }
+                }
+              }
+            }
+          }
         }
       },
       "observer": {

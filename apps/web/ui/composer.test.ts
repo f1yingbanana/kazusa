@@ -138,13 +138,10 @@ describe("ComposerBox", () => {
 });
 
 describe("LineActions", () => {
-  it("names each action, and running one closes them", async () => {
+  it("names each action, and runs the one pressed", async () => {
     const copy = vi.fn();
-    const close = vi.fn();
     render(
       createElement(LineActions, {
-        open: true,
-        onClose: close,
         actions: [
           { label: "Copy text", icon: null, run: copy },
           { label: "Screenshot", icon: null, run: () => {} },
@@ -162,6 +159,5 @@ describe("LineActions", () => {
     expect(result.error?.message).toBeUndefined();
     expect(result.ok).toBe(true);
     expect(copy).toHaveBeenCalledOnce();
-    expect(close).toHaveBeenCalled();
   });
 });

@@ -33,11 +33,11 @@ import { Reveal } from "@/ui/reveal";
 import { COMPOSER_DOCK } from "@/ui/composer";
 import { Segmented, SegmentedItem } from "@/ui/segmented";
 import { ObservingNote } from "../chats/conversation";
+import { Transcript } from "../chats/transcript";
 import { ConversationHeader } from "../chats/conversation-header";
 import { ChatAlone, ChatFailure, EmptyRoom } from "../chats/notices";
 import { conversationParsers } from "../chats/open";
 import { ReplyBox } from "../chats/reply-box";
-import { Transcript } from "../chats/transcript";
 import { useConversation } from "../chats/use-conversation";
 import { useReadingMode } from "@/hooks/use-reading-mode";
 import { useSceneFullscreen } from "@/hooks/use-scene-fullscreen";
@@ -120,10 +120,11 @@ function useTalkStage(chat: ChatInfo, members: readonly string[]) {
   const tools = (
     <>
       {canLive ? (
-        <Reveal shown={live}>
+        <Reveal shown={live} className="-me-1 data-shown:me-1">
           {clock.enabled ? (
             <IconButton
               label="Reading mode"
+              size="md"
               title={READING_HINT}
               aria-pressed={reading.on}
               className={cx(reading.on && "bg-ui-tint text-ui-ink")}
@@ -136,7 +137,7 @@ function useTalkStage(chat: ChatInfo, members: readonly string[]) {
               <BookOpenIcon aria-hidden />
             </IconButton>
           ) : null}
-          <IconButton label="Full screen" onClick={fullscreen.enter}>
+          <IconButton label="Full screen" size="md" onClick={fullscreen.enter}>
             <Maximize2Icon aria-hidden />
           </IconButton>
         </Reveal>
@@ -146,19 +147,18 @@ function useTalkStage(chat: ChatInfo, members: readonly string[]) {
           aria-label="Show as"
           value={rendering.as}
           onValueChange={(next) => next && rendering.setAs(next)}
-          className="ms-1"
         >
           <SegmentedItem
             value="scene"
             aria-label="Scene"
-            className="px-2.5 [&_svg]:size-4"
+            className="px-2.5 max-sm:px-2 [&_svg]:size-4"
           >
             <ImageIcon aria-hidden />
           </SegmentedItem>
           <SegmentedItem
             value="list"
             aria-label="Transcript"
-            className="px-2.5 [&_svg]:size-4"
+            className="px-2.5 max-sm:px-2 [&_svg]:size-4"
           >
             <ListIcon aria-hidden />
           </SegmentedItem>
@@ -253,6 +253,8 @@ export function OwnTalk({
     },
   );
   const alone = !chat.draft && others.length === 0;
+  // Choosing a screenshot, nothing is said: its bar takes the reply box's place.
+  const [shooting, setShooting] = useState(false);
   const transcript = (
     <Transcript
       chat={chat}
@@ -272,6 +274,7 @@ export function OwnTalk({
           <ChatAlone chat={chat} canAdd={canPlay} />
         ) : null
       }
+      onShooting={setShooting}
     />
   );
 
@@ -309,12 +312,13 @@ export function OwnTalk({
                 : undefined
             }
             advanceable={stage.reading.canAdvance}
-            onBacklog={stage.openBacklog}
           />
         ) : (
           <>
             {transcript}
-            <div className={cx("shrink-0", COMPOSER_DOCK)}>
+            <div
+              className={cx("shrink-0", COMPOSER_DOCK, shooting && "hidden")}
+            >
               <ChatFailure members={others} />
               <div className="relative mx-auto max-w-3xl">
                 <ReplyBox {...reply} morph={REPLY_MORPH} />
@@ -400,7 +404,6 @@ export function WatchedTalk({
                 : undefined
             }
             advanceable={stage.reading.canAdvance}
-            onBacklog={stage.openBacklog}
           />
         ) : (
           <>

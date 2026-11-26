@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/ui/toast";
 import { useCastChange } from "@/hooks/use-characters";
 import { useSaveWikiPage } from "@/hooks/use-wiki";
 import { createCharacter } from "@/lib/source/characters/http";

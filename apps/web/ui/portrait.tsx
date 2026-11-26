@@ -76,6 +76,7 @@ export function Portrait({
       data-presence={presence}
       className={cx(
         "group/portrait relative isolate overflow-hidden bg-ui-tint",
+        showImage && "has-[img:not([data-loaded])]:motion-safe:animate-ui-pulse",
         className,
       )}
     >

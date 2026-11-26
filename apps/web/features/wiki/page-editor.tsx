@@ -9,7 +9,7 @@ import type {
 } from "@kazusa/client";
 import { GlobeIcon, MapPinIcon, UsersRoundIcon } from "lucide-react";
 import { useEffect, useId, useState, type ReactNode } from "react";
-import { toast } from "sonner";
+import { toast } from "@/ui/toast";
 import { useCharacters } from "@/hooks/use-characters";
 import { useSaveWikiPage, useWikiList } from "@/hooks/use-wiki";
 import { PersonOptionAvatar } from "../characters/character-picker";
@@ -38,7 +38,7 @@ import {
 import { failureText } from "./failure";
 import { useLeaveGuard } from "./leave-guard";
 import { LinkField } from "./link-field";
-import { TITLE_TRANSITION } from "./motion";
+import { BODY_TRANSITION, TITLE_TRANSITION } from "./motion";
 import { OnePicker } from "@/ui/combobox";
 import { ToggleChip } from "@/ui/toggle";
 import { usePlaceOptions, WhereItIs } from "./place-editor";
@@ -240,7 +240,7 @@ function EditorBar({
       <p
         role="status"
         className={cx(
-          "min-w-0 flex-1 truncate px-1 text-[0.8125rem] font-semibold",
+          "min-w-0 flex-1 px-1 text-[0.8125rem] font-semibold max-sm:order-first max-sm:basis-full",
           conflict ? "text-ui-danger" : "text-ui-soft",
         )}
       >
@@ -298,7 +298,9 @@ function FormEditor({
   onDone: (saved?: WikiSourceResponse) => void;
 }) {
   const source = useWikiForm(id, agent, kind);
-  const [opened, setOpened] = useState<WikiPageForm>();
+  const [opened, setOpened] = useState<WikiPageForm | undefined>(() =>
+    source.data && !source.isValidating ? source.data : undefined,
+  );
   useEffect(() => {
     if (!opened && source.data && !source.isValidating) setOpened(source.data);
   }, [opened, source.data, source.isValidating]);
@@ -321,8 +323,40 @@ function FormEditor({
   );
   const { options: places } = usePlaceOptions();
 
-  if (!opened)
-    return source.error ? <Note>{failureText(source.error)}</Note> : null;
+  if (!opened) {
+    return (
+      <div className={cx("flex min-w-0 flex-col", compact ? "gap-5" : "gap-6")}>
+        <div className="flex flex-col gap-1">
+          <TextInput
+            aria-label="Name"
+            value={name}
+            readOnly
+            style={compact ? undefined : TITLE_TRANSITION}
+            className={cx(
+              "h-auto w-full px-3.5 py-2 leading-tight font-extrabold",
+              compact ? "text-xl" : "text-[1.75rem]",
+            )}
+          />
+          <p
+            title="Page id (linked to filename; can't change)"
+            className="px-1 font-[ui-monospace,monospace] text-xs text-ui-soft"
+          >
+            {id}
+          </p>
+        </div>
+        <div style={compact ? undefined : BODY_TRANSITION}>
+          {source.error ? (
+            <Note>{failureText(source.error)}</Note>
+          ) : (
+            <div className="flex flex-col gap-3" aria-busy="true">
+              <div className="h-9 w-full rounded-[0.875rem] bg-ui-tint motion-safe:animate-ui-pulse" />
+              <div className="h-28 w-full rounded-[1rem] bg-ui-tint motion-safe:animate-ui-pulse" />
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   const initial = draftOf(opened, name);
   const current = draft ?? initial;
@@ -522,7 +556,7 @@ function FormEditor({
             <TextInput
               aria-label="Name"
               value={fields.name ?? ""}
-              style={TITLE_TRANSITION}
+              style={compact ? undefined : TITLE_TRANSITION}
               placeholder={name}
               onChange={(event) => setField({ name: event.target.value })}
               className={cx(
@@ -680,7 +714,7 @@ function FormEditor({
                       media: audienceMedia(EVERYONE),
                     },
                     ...groupOptions,
-                    ...people.map((p) => ({ ...p, hint: "Person" })),
+                    ...people.map((p) => ({ ...p, hint: "Character" })),
                   ].filter(
                     (option) =>
                       !fields.groups.some(
@@ -791,7 +825,6 @@ function FormEditor({
               name={personal ? "The rest" : undefined}
               htmlFor={`${formId}-close`}
               readers={personal ? undefined : readers("close")}
-              hint="## starts a topic."
             >
               {text(
                 "close",

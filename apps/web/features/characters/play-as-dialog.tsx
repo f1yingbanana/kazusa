@@ -2,7 +2,7 @@
 
 import { EyeIcon } from "lucide-react";
 import { useMemo, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/ui/toast";
 import { useCast, useCharacters } from "@/hooks/use-characters";
 import { usePlay } from "@/hooks/use-play";
 import { usePageName } from "@/hooks/use-wiki";

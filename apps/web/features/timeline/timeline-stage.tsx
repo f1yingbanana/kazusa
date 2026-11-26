@@ -34,6 +34,7 @@ import { useCharacters } from "@/hooks/use-characters";
 import { useChats } from "@/hooks/use-chats";
 import { useClockAnchor, useSimNow } from "@/hooks/use-clock";
 import { usePlaces } from "@/hooks/use-location";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { useObservedChats } from "@/hooks/use-observed-chats";
 import { useTimeline } from "@/hooks/use-timeline";
 import { usePageName } from "@/hooks/use-wiki";
@@ -57,6 +58,7 @@ import type { DayPhase } from "@/lib/time/sim";
 import { Button, IconButton } from "@/ui/button";
 import { CheckList, CheckRow } from "@/ui/checkbox";
 import { cx } from "@/ui/cx";
+import { Drawer, DrawerPanel, DrawerTrigger } from "@/ui/drawer";
 import { EmptySeats } from "@/ui/empty-seats";
 import { SearchInput } from "@/ui/input";
 import { Note } from "@/ui/note";
@@ -67,6 +69,7 @@ import { Chronicle, ChronicleDay, ChroniclePhase } from "@/ui/timeline";
 import { NO_FAVORITES } from "../characters/favorites";
 import { BurstRow, EventRow } from "./event-row";
 import { timelineFilterParsers } from "./search-params";
+import { PaneListButton } from "@/ui/pane-nav";
 
 export const PHASE_ICON: Record<DayPhase, ReactNode> = {
   Night: <MoonIcon aria-hidden />,
@@ -258,6 +261,7 @@ export function TimelineStage() {
               {following}
             </span>
           ) : null}
+          <PaneListButton className="ms-auto" />
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -272,6 +276,7 @@ export function TimelineStage() {
           />
           <Segmented<TimelinePreset>
             aria-label="Detail level"
+            className="@max-[48rem]/stage:order-last @max-[48rem]/stage:flex @max-[48rem]/stage:w-full"
             value={preset}
             onValueChange={(next) => {
               if (next) {
@@ -424,7 +429,7 @@ export function TimelineStage() {
               })}
             </Chronicle>
 
-            <footer className="flex flex-col items-center gap-2 px-5 pt-6 text-center">
+            <footer className="flex flex-col items-center gap-2 px-5 pt-6 pb-8 text-center">
               {timeline.hasMore ? (
                 <Button
                   tone="soft"
@@ -461,94 +466,108 @@ function KindFilterPopover({
     nextInFacet: readonly JournalKind[],
   ) => boolean;
 }) {
+  const phone = useMediaQuery("(max-width: 767px)");
+  const trigger = (
+    <IconButton
+      label="Event types"
+      title="Filter event types"
+      tone={isCustom ? "primary" : "soft"}
+      size="md"
+      className={cx(isCustom && "inset-ring-2 inset-ring-ui-primary")}
+    />
+  );
+  const content = (
+    <div className="flex flex-col">
+      {TIMELINE_FACETS.map((facet) => {
+        if (facet.kinds.length === 1) {
+          const kind = facet.kinds[0];
+          const Icon = KIND_ICONS[kind];
+          const checked = effectiveKinds.includes(kind);
+          return (
+            <CheckRow
+              key={facet.id}
+              checked={checked}
+              disabled={checked && effectiveKinds.length === 1}
+              icon={<Icon />}
+              label={facet.label}
+              className="min-h-8 py-1"
+              onCheckedChange={(next, details) => {
+                if (!onToggleSingle(kind, next === true)) {
+                  details.cancel();
+                }
+              }}
+            />
+          );
+        }
+
+        const inFacet = facet.kinds.filter((k) => effectiveKinds.includes(k));
+
+        return (
+          <CheckList<JournalKind>
+            key={facet.id}
+            label={facet.label}
+            allValues={[...facet.kinds]}
+            value={[...inFacet]}
+            className="gap-0"
+            onValueChange={(next, details) => {
+              if (!onReplaceFacet(facet, next)) {
+                details.cancel();
+              }
+            }}
+          >
+            <CheckRow
+              parent
+              disabled={
+                inFacet.length > 0 && inFacet.length === effectiveKinds.length
+              }
+              label={facet.label}
+              className="min-h-8 py-1"
+            />
+            <div className="flex flex-col ps-5">
+              {facet.kinds.map((kind) => {
+                const Icon = KIND_ICONS[kind];
+                const checked = effectiveKinds.includes(kind);
+                return (
+                  <CheckRow
+                    key={kind}
+                    value={kind}
+                    disabled={checked && effectiveKinds.length === 1}
+                    icon={<Icon />}
+                    label={KIND_LABEL[kind]}
+                    className="min-h-7.5 py-0.5 text-[0.8125rem]"
+                  />
+                );
+              })}
+            </div>
+          </CheckList>
+        );
+      })}
+    </div>
+  );
+
+  if (phone) {
+    return (
+      <Drawer side="bottom">
+        <DrawerTrigger render={trigger}>
+          <ListFilterIcon aria-hidden />
+        </DrawerTrigger>
+        <DrawerPanel title="Event types" handle="Close" fit>
+          <div className="overflow-y-auto px-3 pt-3 pb-1">{content}</div>
+        </DrawerPanel>
+      </Drawer>
+    );
+  }
+
   return (
     <Popover>
-      <PopoverTrigger
-        render={
-          <IconButton
-            label="Event types"
-            title="Filter event types"
-            tone={isCustom ? "primary" : "soft"}
-            size="md"
-            className={cx(isCustom && "inset-ring-2 inset-ring-ui-primary")}
-          />
-        }
-      >
+      <PopoverTrigger render={trigger}>
         <ListFilterIcon aria-hidden />
       </PopoverTrigger>
       <PopoverContent
         aria-label="Event types"
-        className="w-[min(17rem,calc(100vw-2rem))] gap-1 p-2.5"
+        className="max-h-[min(36rem,var(--available-height,80dvh))] w-[min(17rem,calc(100vw-2rem))] gap-1 overflow-y-auto p-2.5"
       >
-        <div className="flex flex-col">
-          {TIMELINE_FACETS.map((facet) => {
-            if (facet.kinds.length === 1) {
-              const kind = facet.kinds[0];
-              const Icon = KIND_ICONS[kind];
-              const checked = effectiveKinds.includes(kind);
-              return (
-                <CheckRow
-                  key={facet.id}
-                  checked={checked}
-                  disabled={checked && effectiveKinds.length === 1}
-                  icon={<Icon />}
-                  label={facet.label}
-                  className="min-h-8 py-1"
-                  onCheckedChange={(next, details) => {
-                    if (!onToggleSingle(kind, next === true)) {
-                      details.cancel();
-                    }
-                  }}
-                />
-              );
-            }
-
-            const inFacet = facet.kinds.filter((k) =>
-              effectiveKinds.includes(k),
-            );
-
-            return (
-              <CheckList<JournalKind>
-                key={facet.id}
-                label={facet.label}
-                allValues={[...facet.kinds]}
-                value={[...inFacet]}
-                className="gap-0"
-                onValueChange={(next, details) => {
-                  if (!onReplaceFacet(facet, next)) {
-                    details.cancel();
-                  }
-                }}
-              >
-                <CheckRow
-                  parent
-                  disabled={
-                    inFacet.length > 0 &&
-                    inFacet.length === effectiveKinds.length
-                  }
-                  label={facet.label}
-                  className="min-h-8 py-1"
-                />
-                <div className="flex flex-col ps-5">
-                  {facet.kinds.map((kind) => {
-                    const Icon = KIND_ICONS[kind];
-                    const checked = effectiveKinds.includes(kind);
-                    return (
-                      <CheckRow
-                        key={kind}
-                        value={kind}
-                        disabled={checked && effectiveKinds.length === 1}
-                        icon={<Icon />}
-                        label={KIND_LABEL[kind]}
-                        className="min-h-7.5 py-0.5 text-[0.8125rem]"
-                      />
-                    );
-                  })}
-                </div>
-              </CheckList>
-            );
-          })}
-        </div>
+        {content}
       </PopoverContent>
     </Popover>
   );

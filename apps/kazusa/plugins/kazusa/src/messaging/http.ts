@@ -41,6 +41,7 @@ import {
   type ObservedConversation,
 } from "./messaging.ts";
 import { WatchingError, type Actor, type Player } from "../player.ts";
+import { shutdownSignal } from "../shutdown.ts";
 
 const HISTORY = z.object({
   chatId: z.string().min(1),
@@ -469,11 +470,21 @@ export function registerMessagingHttp(
     res.on("error", (error) => {
       api.logger.warn(`Event stream failed: ${String(error)}`);
     });
+    // OpenClaw holds a stop or restart until every request has ended, and an
+    // event stream never ends by itself: end it when the drain begins. The
+    // browser's EventSource reconnects once the Gateway is back.
+    const stopping = shutdownSignal();
+    const endOnStop = () => {
+      if (!res.writableEnded) res.end();
+    };
+    stopping.addEventListener("abort", endOnStop, { once: true });
     res.on("close", () => {
       unsubscribeMessaging();
       unsubscribeBroadcaster?.();
       clearInterval(heartbeat);
+      stopping.removeEventListener("abort", endOnStop);
     });
+    if (stopping.aborted) endOnStop();
     try {
       const typing = watching
         ? await watchedTyping()
@@ -489,7 +500,7 @@ export function registerMessagingHttp(
       const statuses = options?.getStatuses
         ? await options.getStatuses()
         : undefined;
-      if (res.destroyed) return;
+      if (res.destroyed || res.writableEnded) return;
       res.writeHead(200, {
         "Content-Type": "text/event-stream; charset=utf-8",
         "Cache-Control": "no-cache, no-transform",

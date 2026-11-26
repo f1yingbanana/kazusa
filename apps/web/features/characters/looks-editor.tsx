@@ -7,7 +7,7 @@ import type {
 } from "@kazusa/client";
 import { PlusIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/ui/toast";
 import {
   removePicture,
   saveStickers,
@@ -142,9 +142,12 @@ function OutfitHead({
 export function LooksEditor({
   character,
   onChanged,
+  onClose,
 }: {
   character: WikiCharacterResponse;
   onChanged: () => Promise<unknown>;
+  /** Back to the looks; each change is already saved by then. */
+  onClose: () => void;
 }) {
   const [adding, setAdding] = useState<{
     kind: "portrait" | "sticker";
@@ -325,6 +328,18 @@ export function LooksEditor({
           toast.success(`Added ${picture}`);
         }}
       />
+      <div
+        role="region"
+        aria-label="Editing"
+        className="sticky bottom-3 z-20 flex items-center gap-2 rounded-[1.25rem] ui-raised px-3 py-2"
+      >
+        <p className="min-w-0 flex-1 px-1 text-[0.8125rem] font-semibold text-ui-soft">
+          Every change is saved as you make it.
+        </p>
+        <Button tone="primary" size="sm" onClick={onClose}>
+          Close editor
+        </Button>
+      </div>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/ui/toast";
 import { useAccess } from "@/hooks/use-access";
 import { readSimNow } from "@/hooks/use-clock";
 import { useChatActions, useMessages } from "@/hooks/use-chats";
@@ -86,7 +86,7 @@ export function useConversation(
         toast.error("Message not delivered", {
           description: error instanceof Error ? error.message : undefined,
           ...(onFailed
-            ? { action: { label: onFailed.label, onClick: onFailed.run } }
+            ? { action: { label: onFailed.label, onAction: onFailed.run } }
             : {}),
         });
       }

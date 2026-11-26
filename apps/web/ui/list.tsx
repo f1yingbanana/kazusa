@@ -2,6 +2,7 @@
 
 import { XIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import { TextButton } from "./button";
 import { Tooltip } from "./tooltip";
 import { VisuallyHidden } from "./visually-hidden";
 
@@ -80,8 +81,7 @@ export function ListRow({
   trailing?: ReactNode;
 }) {
   return (
-    <button
-      type="button"
+    <TextButton
       className="flex w-full items-center gap-3 rounded-[1rem] px-3 py-2.5 text-start transition-colors duration-150 hover:bg-ui-tint focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ui-primary aria-current:bg-ui-surface aria-current:inset-ring-2 aria-current:inset-ring-ui-primary"
       aria-current={current ? "true" : undefined}
       onClick={onClick}
@@ -94,7 +94,7 @@ export function ListRow({
         ) : null}
       </span>
       {trailing}
-    </button>
+    </TextButton>
   );
 }
 
@@ -125,13 +125,13 @@ export function FilterChip({
     <div className="ms-1 mb-3 inline-flex items-center gap-1.5 self-start rounded-full bg-ui-accent-tint py-1 ps-3 pe-1.5 text-[0.8125rem] font-bold text-ui-accent-ink">
       <span>{children}</span>
       <Tooltip label={clearLabel} names>
-        <button
-          type="button"
+        <TextButton
+          aria-label={clearLabel}
           className="grid place-items-center rounded-full"
           onClick={onClear}
         >
           <XIcon aria-hidden className="size-3.5" />
-        </button>
+        </TextButton>
       </Tooltip>
     </div>
   );

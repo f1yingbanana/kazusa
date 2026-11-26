@@ -42,7 +42,7 @@ export function SelectTrigger({
     <Trigger
       {...props}
       className={cx(
-        "flex h-10 w-full min-w-0 items-center justify-between gap-2 rounded-[0.875rem] bg-ui-ground px-3.5 text-sm font-semibold text-ui-ink inset-ring inset-ring-ui-line transition-colors outline-none hover:bg-ui-tint focus-visible:inset-ring-2 focus-visible:inset-ring-ui-primary data-[disabled]:cursor-not-allowed data-[disabled]:opacity-55",
+        "flex h-10 w-fit max-w-full min-w-0 items-center justify-between gap-2 rounded-[0.875rem] bg-ui-ground px-3.5 text-sm font-semibold text-ui-ink inset-ring inset-ring-ui-line transition-colors outline-none hover:bg-ui-tint focus-visible:inset-ring-2 focus-visible:inset-ring-ui-primary data-[disabled]:cursor-not-allowed data-[disabled]:opacity-55",
         className,
       )}
     >

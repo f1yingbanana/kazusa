@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import { useQueryState } from "nuqs";
-import { chatsParsers } from "@/components/views/chats/search-params";
+import { chatsParsers } from "@/features/chats/search-params";
 import { useSWRConfig } from "swr";
 import { useAccess } from "@/hooks/use-access";
 import { playAs } from "@/lib/source/player/http";

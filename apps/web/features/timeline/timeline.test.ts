@@ -8,9 +8,20 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { withNuqsTestingAdapter, type UrlUpdateEvent } from "nuqs/adapters/testing";
+import {
+  withNuqsTestingAdapter,
+  type UrlUpdateEvent,
+} from "nuqs/adapters/testing";
 import { createElement, type ReactNode } from "react";
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { createAgent } from "@/ui/agent";
 import { TimelineSidebar } from "./timeline-sidebar";
 import { TimelineStage } from "./timeline-stage";
@@ -232,28 +243,13 @@ vi.mock("@/lib/state/preferences-store", () => ({
   useWatchlist: () => mockWatchlist,
 }));
 
-vi.mock("../legacy", () => ({
-  chatIcon: () => () => null,
-  useChatTitle: () => ({
-    title: "Chat",
-    type: "direct",
-    mine: false,
-    readable: false,
-    members: [],
-  }),
-  wikiParsers: {
-    "wiki.page": { parse: (v: string) => v, serialize: (v: string) => v },
-    "wiki.agent": { parse: (v: string) => v, serialize: (v: string) => v },
-    "wiki.part": { parse: (v: string) => v, serialize: (v: string) => v },
-    "wiki.edit": { parse: (v: string) => v, serialize: (v: string) => v },
-    "wiki.raw": { parse: (v: string) => v, serialize: (v: string) => v },
-  },
-  chatsParsers: {
-    "chats.id": { parse: (v: string) => v, serialize: (v: string) => v },
-  },
-}));
-
 beforeAll(() => {
+  window.matchMedia ??= () =>
+    ({
+      matches: false,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }) as unknown as MediaQueryList;
   globalThis.__UI_SDK_STRICT__ = true;
   HTMLElement.prototype.showPopover = function () {};
   HTMLElement.prototype.hidePopover = function () {};
@@ -356,9 +352,7 @@ describe("Timeline feature", () => {
     expect(screen.getByText("Reviewing notes")).toBeDefined();
 
     const searchRes = await agent.act({
-      steps: [
-        { ref: "Search events", action: "setValue", args: ["parfaits"] },
-      ],
+      steps: [{ ref: "Search events", action: "setValue", args: ["parfaits"] }],
     });
     expect(searchRes.error?.message).toBeUndefined();
     expect(searchRes.ok).toBe(true);
@@ -420,6 +414,27 @@ describe("Timeline feature", () => {
     expect(loadRes.error?.message).toBeUndefined();
     expect(loadRes.ok).toBe(true);
     expect(loadMore).toHaveBeenCalledOnce();
+  });
+
+  it("opens event type filters as a bottom drawer sheet on phones", async () => {
+    const originalMatchMedia = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      matches: query === "(max-width: 767px)",
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    })) as unknown as typeof window.matchMedia;
+    try {
+      render(createElement(TimelineHarness));
+      fireEvent.click(screen.getByRole("button", { name: "Event types" }));
+      const dialog = await screen.findByRole("dialog", { name: "Event types" });
+      expect(dialog.dataset.slot).toBe("drawer-content");
+      expect(
+        within(dialog).getByRole("checkbox", { name: "Messages" }),
+      ).toBeDefined();
+    } finally {
+      window.matchMedia = originalMatchMedia;
+    }
   });
 
   it("keeps existing favorites when co-following someone else from Favorites", async () => {
@@ -508,9 +523,7 @@ describe("Timeline feature", () => {
     );
 
     await waitFor(() => {
-      expect(
-        screen.getByText("Fresh event after filter switch"),
-      ).toBeDefined();
+      expect(screen.getByText("Fresh event after filter switch")).toBeDefined();
     });
   });
 });

@@ -9,7 +9,7 @@ import {
   useLiveStore,
   type LiveState,
 } from "./state";
-import { dispatchLive } from "../registry/live";
+import { dispatchLive } from "./dispatch";
 import { useSimNow } from "../../hooks/use-clock";
 
 beforeEach(() => {

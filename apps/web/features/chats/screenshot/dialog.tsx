@@ -11,7 +11,7 @@ import {
 import { domToBlob } from "modern-screenshot";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { toast } from "sonner";
+import { toast } from "@/ui/toast";
 import { exportScale } from "@/lib/source/chats/screenshot";
 import type { ChatInfo } from "@/lib/source/chats/types";
 import { Button } from "@/ui/button";
@@ -194,6 +194,7 @@ export function ScreenshotDialog({
           description={`${count} ${count === 1 ? "message" : "messages"}`}
           size="sm"
           full
+          closable
           footer={
             <>
               <Button

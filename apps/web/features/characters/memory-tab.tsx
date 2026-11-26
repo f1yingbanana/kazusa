@@ -20,9 +20,11 @@ import { MemoryEditor } from "./memory-editor";
 export function MemoryTab({
   character,
   editing = false,
+  onClose,
 }: {
   character: CharacterSummary;
   editing?: boolean;
+  onClose?: () => void;
 }) {
   const { data, error, isLoading, mutate } = useWikiCharacter(character.id);
   const { data: own } = useWikiList(character.id);
@@ -36,7 +38,7 @@ export function MemoryTab({
   const days = pages.filter((p) => p.kind === "day").length;
   const concepts = pages.length - people - days;
   const counts = [
-    people ? `${people} ${people === 1 ? "person" : "people"}` : null,
+    people ? `${people} ${people === 1 ? "character" : "characters"}` : null,
     concepts ? `${concepts} ${concepts === 1 ? "concept" : "concepts"}` : null,
     days ? `${days} ${days === 1 ? "day" : "days"} in a diary` : null,
   ].filter(Boolean);
@@ -63,6 +65,7 @@ export function MemoryTab({
             id={character.id}
             memory={data.memory}
             onSaved={() => mutate()}
+            onClose={() => onClose?.()}
           />
         ) : data.memory.text.trim() ? (
           <Prose text={data.memory.text} />

@@ -19,7 +19,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { toast } from "sonner";
+import { toast } from "@/ui/toast";
 import { useAccess } from "@/hooks/use-access";
 import { useCharacters } from "@/hooks/use-characters";
 import { useOffstage, useStage } from "@/hooks/use-stage";
@@ -27,7 +27,7 @@ import { usePageLookup, usePageName, useWikiList } from "@/hooks/use-wiki";
 import { NO_GROUP, nearestGroup } from "@/lib/state/grouping";
 import { useWatchlist } from "@/lib/state/preferences-store";
 import { openPlayDialog } from "@/lib/state/ui-store";
-import { IconButton } from "@/ui/button";
+import { IconButton, TextButton } from "@/ui/button";
 import { cx } from "@/ui/cx";
 import { SearchInput } from "@/ui/input";
 import {
@@ -79,7 +79,11 @@ function headingSpan(label: string): number {
  * Everyone in the world, face first, like a yearbook: by group or by name. A
  * card opens their profile; going back puts you on the card you left from.
  */
-export function Gallery() {
+export function Gallery({
+  onOpen,
+}: {
+  onOpen?: (id: string, navigate: () => void) => void;
+} = {}) {
   const { groups, cast, show, query, by } = useCastBook();
   const offstage = useOffstage();
   const [, setParams] = useQueryStates({
@@ -122,20 +126,22 @@ export function Gallery() {
 
   const open = (id: string) => {
     rememberGalleryFocus(id);
-    void setParams(profilePatch(id));
+    const navigate = () => void setParams(profilePatch(id));
+    if (onOpen) onOpen(id, navigate);
+    else navigate();
   };
 
   return (
     <div className="flex min-h-0 flex-col">
       <header className="flex flex-wrap items-center gap-3 px-6 pt-5 pb-1 max-md:px-4 max-md:pt-4">
-        <div className="me-auto flex min-w-0 items-baseline gap-2">
+        <div className="me-auto flex min-w-0 items-baseline gap-2 max-sm:w-full">
           <h1 className="text-[1.375rem] font-extrabold">Characters</h1>
           <p className="text-sm font-bold text-ui-soft tabular-nums">
             {`${onstageCount} of ${cast.length} onstage`}
           </p>
         </div>
         <SearchInput
-          className="w-60 flex-none bg-ui-ground max-sm:w-full"
+          className="w-60 flex-none bg-ui-ground max-sm:w-auto max-sm:min-w-0 max-sm:flex-1"
           aria-label="Find a character or group"
           placeholder="Find by name or group"
           value={query}
@@ -149,6 +155,7 @@ export function Gallery() {
         />
         <Segmented<Show>
           aria-label="Show"
+          className="max-sm:order-last max-sm:flex max-sm:w-full"
           value={show ?? "all"}
           onValueChange={(next) =>
             next &&
@@ -456,9 +463,8 @@ const Card = memo(function Card({
   const group =
     showGroup && character.groups?.[0] ? pageName(character.groups[0]) : "";
   return (
-    <button
+    <TextButton
       ref={button}
-      type="button"
       data-presence={presence}
       onClick={() => onOpen(character.id)}
       className="group/card flex w-full flex-col gap-2 rounded-[1rem] text-start outline-none"
@@ -492,6 +498,6 @@ const Card = memo(function Card({
           </span>
         ) : null}
       </span>
-    </button>
+    </TextButton>
   );
 });
