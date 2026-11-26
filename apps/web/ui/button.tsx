@@ -95,7 +95,12 @@ export function Button({
       <LoaderCircleIcon aria-hidden className={SPINNER} />
       {children != null ? (
         <span
-          className={cx("min-w-0 truncate", collapse && "@max-[22rem]:hidden")}
+          className={cx(
+            typeof children === "string" || typeof children === "number"
+              ? "min-w-0 truncate"
+              : "inline-flex min-w-0 items-center gap-1.5",
+            collapse && "@max-[22rem]:hidden",
+          )}
         >
           {children}
         </span>

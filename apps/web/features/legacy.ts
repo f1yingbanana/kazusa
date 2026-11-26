@@ -5,15 +5,7 @@
 */
 
 export { CharacterBrainSheet } from "@/components/inspector/sections/character-brain";
-export {
-  CharacterContextSection,
-  CharacterContextSummary,
-} from "@/components/inspector/sections/character-context";
 export { CharacterMemorySheet } from "@/components/inspector/sections/character-memory";
-export {
-  CharacterModelSection,
-  CharacterModelSummary,
-} from "@/components/inspector/sections/character-model";
 export { CharacterNowSection } from "@/components/inspector/sections/character-now";
 export {
   CharacterRecentSection,

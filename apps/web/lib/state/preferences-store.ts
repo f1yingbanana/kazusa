@@ -5,6 +5,12 @@ import {
   type StateStorage,
 } from "zustand/middleware";
 
+export type ThemeMode = "system" | "light" | "dark";
+export type PaletteId = "sky" | "crimson" | "cyan" | "sand";
+
+const THEME_MODES = new Set<ThemeMode>(["system", "light", "dark"]);
+const PALETTE_IDS = new Set<PaletteId>(["sky", "crimson", "cyan", "sand"]);
+
 export interface PreferencesState {
   readonly watchlist: readonly string[];
   readonly inspectorFolds: Readonly<Record<string, boolean>>;
@@ -15,6 +21,8 @@ export interface PreferencesState {
    * or without art) or as the transcript.
    */
   readonly huddleRendering: "scene" | "list";
+  readonly themeMode: ThemeMode;
+  readonly palette: PaletteId;
 }
 
 export const DEFAULT_PREFERENCES: PreferencesState = {
@@ -23,6 +31,8 @@ export const DEFAULT_PREFERENCES: PreferencesState = {
   observedCollapsed: false,
   dismissedUpdateVersion: null,
   huddleRendering: "scene",
+  themeMode: "system",
+  palette: "sky",
 };
 
 const STORAGE_KEY = "kazusa:preferences";
@@ -69,12 +79,25 @@ export function sanitizePreferences(raw: unknown): PreferencesState {
       ? obj.huddleRendering
       : DEFAULT_PREFERENCES.huddleRendering;
 
+  const themeMode =
+    typeof obj.themeMode === "string" &&
+    THEME_MODES.has(obj.themeMode as ThemeMode)
+      ? (obj.themeMode as ThemeMode)
+      : DEFAULT_PREFERENCES.themeMode;
+
+  const palette =
+    typeof obj.palette === "string" && PALETTE_IDS.has(obj.palette as PaletteId)
+      ? (obj.palette as PaletteId)
+      : DEFAULT_PREFERENCES.palette;
+
   return {
     watchlist,
     inspectorFolds,
     observedCollapsed,
     dismissedUpdateVersion,
     huddleRendering,
+    themeMode,
+    palette,
   };
 }
 
@@ -156,6 +179,14 @@ export function setHuddleRendering(rendering: "scene" | "list"): void {
   usePreferencesStore.setState({ huddleRendering: rendering });
 }
 
+export function setThemeMode(themeMode: ThemeMode): void {
+  usePreferencesStore.setState({ themeMode });
+}
+
+export function setPalette(palette: PaletteId): void {
+  usePreferencesStore.setState({ palette });
+}
+
 export function resetPreferences(): void {
   usePreferencesStore.setState(DEFAULT_PREFERENCES, true);
 }
@@ -178,4 +209,12 @@ export function useDismissedUpdateVersion(): string | null {
 
 export function useHuddleRendering(): "scene" | "list" {
   return usePreferencesStore((state) => state.huddleRendering);
+}
+
+export function useThemeMode(): ThemeMode {
+  return usePreferencesStore((state) => state.themeMode);
+}
+
+export function usePalettePreference(): PaletteId {
+  return usePreferencesStore((state) => state.palette);
 }

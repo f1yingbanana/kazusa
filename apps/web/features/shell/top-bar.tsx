@@ -3,19 +3,13 @@
 import { SearchIcon, SettingsIcon } from "lucide-react";
 import { IconButton } from "@/ui/button";
 import { cx } from "@/ui/cx";
-import type { Palette } from "@/ui/palettes";
 import { Clock } from "./clock";
-import { PalettePicker } from "./palette-picker";
 
 export function TopBar({
-  palette,
-  onPaletteChange,
   onOpenCommand,
   onOpenSettings,
   className,
 }: {
-  palette: Palette;
-  onPaletteChange: (palette: Palette) => void;
   onOpenCommand: () => void;
   onOpenSettings: () => void;
   className?: string;
@@ -53,7 +47,6 @@ export function TopBar({
             ⌘K
           </kbd>
         </button>
-        <PalettePicker palette={palette} onPaletteChange={onPaletteChange} />
         <IconButton
           label="Settings"
           className="hidden max-md:inline-flex"

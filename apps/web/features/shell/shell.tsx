@@ -11,7 +11,6 @@ import type { SectionSidebarProps } from "@/lib/registry/types";
 import { SourcesProvider, useSources } from "@/lib/source/provider";
 import { syncPreferences } from "@/lib/state/preferences-store";
 import { Drawer, DrawerPanel } from "@/ui/drawer";
-import type { Palette } from "@/ui/palettes";
 import { Segmented, SegmentedItem } from "@/ui/segmented";
 import { CharactersStage } from "../characters/characters-stage";
 import { PlayAsDialog } from "../characters/play-as-dialog";
@@ -24,6 +23,9 @@ import {
   VisitorWelcome,
   WorldUpdateNotice,
 } from "../legacy";
+import { SettingsSidebar } from "../settings/settings-sidebar";
+import { SettingsStage } from "../settings/settings-stage";
+import { UpdateSaveDialog } from "../settings/update-save-dialog";
 import { TimelineSidebar } from "../timeline/timeline-sidebar";
 import { TimelineStage } from "../timeline/timeline-stage";
 import { WhosWhere } from "../world/whos-where";
@@ -32,7 +34,7 @@ import { CommandPalette } from "./command-palette";
 import { DetailsPanel } from "./details-panel";
 import { SectionNav } from "./section-nav";
 import { TopBar } from "./top-bar";
-import { usePalette } from "./use-palette";
+import { useAppearance } from "./use-palette";
 import { useDetailsSheet } from "./use-sheet";
 
 /** Sections rebuilt here; the rest still come from the registry's old views. */
@@ -40,6 +42,7 @@ const SIDEBARS: Record<string, ComponentType<SectionSidebarProps> | null> = {
   // The cast is the stage, and a profile is a page in it: no list beside them.
   characters: null,
   chats: ChatList,
+  settings: SettingsSidebar,
   timeline: TimelineSidebar,
   world: WhosWhere,
 };
@@ -47,12 +50,14 @@ const SIDEBARS: Record<string, ComponentType<SectionSidebarProps> | null> = {
 const STAGES: Record<string, ComponentType> = {
   characters: CharactersStage,
   chats: ChatsStage,
+  settings: SettingsStage,
   timeline: TimelineStage,
   world: WorldStage,
 };
 
 const PANE_LABELS: Record<string, [string, string]> = {
   chats: ["Conversations", "Thread"],
+  settings: ["Categories", "Settings"],
   timeline: ["People", "Timeline"],
   world: ["Who's where", "Map"],
 };
@@ -61,23 +66,17 @@ type Pane = "list" | "stage";
 
 export function Shell() {
   useEffect(syncPreferences, []);
-  const [palette, setPalette] = usePalette();
+  useAppearance();
   return (
     <SourcesProvider fallback={<Loading />}>
       <RealtimeProvider>
-        <Frame palette={palette} onPaletteChange={setPalette} />
+        <Frame />
       </RealtimeProvider>
     </SourcesProvider>
   );
 }
 
-function Frame({
-  palette,
-  onPaletteChange,
-}: {
-  palette: Palette;
-  onPaletteChange: (palette: Palette) => void;
-}) {
+function Frame() {
   useSwitchResets();
   const [commandOpen, setCommandOpen] = useState(false);
   const [selection, select] = useSelection();
@@ -124,8 +123,6 @@ function Frame({
     <div className="grid h-dvh grid-cols-[5.5rem_minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto] bg-ui-ground text-ui-ink max-md:grid-cols-[minmax(0,1fr)]">
       <TopBar
         className="col-span-full"
-        palette={palette}
-        onPaletteChange={onPaletteChange}
         onOpenCommand={() => setCommandOpen(true)}
         onOpenSettings={() => void setView("settings")}
       />
@@ -190,10 +187,10 @@ function Frame({
       <CommandPalette
         open={commandOpen}
         onOpenChange={setCommandOpen}
-        onPaletteChange={onPaletteChange}
         onOpenedChat={() => setPane("stage")}
       />
       <WorldUpdateNotice />
+      <UpdateSaveDialog />
       <PlayAsDialog />
       <VisitorWelcome />
     </div>

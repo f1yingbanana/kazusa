@@ -9,10 +9,6 @@ import { Detail, DetailAbout, DetailHeader } from "@/ui/detail";
 import { Fold, Folds } from "@/ui/fold";
 import { Note } from "@/ui/note";
 import {
-  CharacterContextSection,
-  CharacterContextSummary,
-  CharacterModelSection,
-  CharacterModelSummary,
   CharacterRecentSection,
   CharacterRecentSummary,
   CharacterStatesSection,
@@ -24,6 +20,12 @@ import { CharacterAvatar } from "./character-avatar";
 import { Desires } from "./desires";
 import { usePresence } from "./presence";
 import { RightNow } from "./right-now";
+import {
+  CharacterContextSection,
+  CharacterContextSummary,
+  CharacterModelSection,
+  CharacterModelSummary,
+} from "./settings-folds";
 
 type FoldSpec = {
   value: string;

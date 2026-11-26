@@ -30,6 +30,7 @@ html[data-palette="sand"] {
 }
 
 html[data-palette] {
+  color-scheme: light;
   --ui-ground: oklch(0.975 0.014 var(--hue));
   --ui-surface: oklch(0.997 0.004 var(--hue));
   --ui-tint: oklch(0.945 0.03 var(--hue));
@@ -44,12 +45,14 @@ html[data-palette] {
   --ui-accent-tint: oklch(0.95 0.035 var(--hue-2));
   --ui-shadow: 0 18px 40px -24px oklch(0.45 0.1 var(--hue) / 0.35);
   --ui-scrim: oklch(0.15 0.03 var(--hue) / 0.4);
+  --ui-ok: oklch(0.58 0.17 155);
   --ui-danger: oklch(0.55 0.19 25);
   --ui-font: var(--ui-font-face, ui-rounded), ui-rounded, system-ui, sans-serif;
   background: var(--ui-ground);
 }
 
 html[data-palette].dark {
+  color-scheme: dark;
   --ui-ground: oklch(0.19 0.03 var(--hue));
   --ui-surface: oklch(0.235 0.035 var(--hue));
   --ui-tint: oklch(0.29 0.045 var(--hue));
@@ -62,11 +65,13 @@ html[data-palette].dark {
   --ui-accent-ink: oklch(0.82 var(--c2) var(--hue-2));
   --ui-accent-tint: oklch(0.3 0.06 var(--hue-2));
   --ui-shadow: 0 18px 40px -24px oklch(0 0 0 / 0.6);
+  --ui-ok: oklch(0.72 0.16 155);
   --ui-danger: oklch(0.72 0.15 25);
 }
 
 @media (prefers-color-scheme: dark) {
   html[data-palette]:not(.light) {
+    color-scheme: dark;
     --ui-ground: oklch(0.19 0.03 var(--hue));
     --ui-surface: oklch(0.235 0.035 var(--hue));
     --ui-tint: oklch(0.29 0.045 var(--hue));
@@ -79,6 +84,7 @@ html[data-palette].dark {
     --ui-accent-ink: oklch(0.82 var(--c2) var(--hue-2));
     --ui-accent-tint: oklch(0.3 0.06 var(--hue-2));
     --ui-shadow: 0 18px 40px -24px oklch(0 0 0 / 0.6);
+    --ui-ok: oklch(0.72 0.16 155);
     --ui-danger: oklch(0.72 0.15 25);
   }
 }
