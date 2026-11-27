@@ -67,8 +67,8 @@ const CORNERS: Record<Side, Record<RunPosition, string>> = {
 };
 
 const TONE: Record<BubbleTone, string> = {
-  theirs: "bg-ui-tint text-ui-ink",
-  mine: "bg-ui-primary text-ui-on-primary",
+  theirs: "bg-(--ui-bubble-theirs) text-(--ui-bubble-theirs-ink)",
+  mine: "bg-(--ui-bubble-mine) text-(--ui-bubble-mine-ink)",
   failed:
     "bg-ui-surface text-ui-ink inset-ring-2 inset-ring-ui-danger [&_a]:text-ui-danger",
 };

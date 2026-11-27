@@ -28,6 +28,12 @@ export const PALETTES = [
     hint: "Warm sand and teal",
     swatch: ["oklch(0.72 0.11 62)", "oklch(0.62 0.12 190)"],
   },
+  {
+    value: "kazusa",
+    label: "Kazusa",
+    hint: "Dark plum with magenta and teal",
+    swatch: ["rgb(198 67 130)", "rgb(8 114 103)"],
+  },
 ] as const;
 
 export type Palette = (typeof PALETTES)[number]["value"];

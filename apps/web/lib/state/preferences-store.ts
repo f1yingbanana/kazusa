@@ -6,10 +6,21 @@ import {
 } from "zustand/middleware";
 
 export type ThemeMode = "system" | "light" | "dark";
-export type PaletteId = "sky" | "crimson" | "cyan" | "sand";
+export type PaletteId =
+  | "sky"
+  | "crimson"
+  | "cyan"
+  | "sand"
+  | "kazusa";
 
 const THEME_MODES = new Set<ThemeMode>(["system", "light", "dark"]);
-const PALETTE_IDS = new Set<PaletteId>(["sky", "crimson", "cyan", "sand"]);
+const PALETTE_IDS = new Set<PaletteId>([
+  "sky",
+  "crimson",
+  "cyan",
+  "sand",
+  "kazusa",
+]);
 
 export interface PreferencesState {
   readonly watchlist: readonly string[];

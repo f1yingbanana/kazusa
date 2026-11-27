@@ -9,7 +9,7 @@ import {
   openVisitorWelcome,
   useUiStore,
 } from "@/lib/state/ui-store";
-import { buttonClass } from "@/ui/button";
+import { Button } from "@/ui/button";
 import { Dialog, DialogClose, DialogPanel } from "@/ui/dialog";
 import { SocialGlyph, socialLink, type SocialLink } from "./social-links";
 
@@ -35,8 +35,8 @@ function markSeen() {
 
 /** Where a visitor goes for a world of their own; the glyph names the site. */
 const OWN_WORLD: readonly { link: SocialLink; label: string }[] = [
-  { link: socialLink("GitHub"), label: "Make your own" },
-  { link: socialLink("Discord"), label: "Join Discord" },
+  { link: socialLink("GitHub"), label: "GitHub" },
+  { link: socialLink("Discord"), label: "Discord" },
 ];
 
 /**
@@ -65,54 +65,51 @@ export function VisitorWelcome() {
     <Dialog open={open && visitor} onOpenChange={(next) => !next && close()}>
       <DialogPanel
         title={
-          world?.title
+          note?.title ??
+          (world?.title
             ? `You're watching ${world.title}`
-            : "You're watching a live world"
+            : "You're watching a live world")
         }
-        description="The characters here get on with their lives on their own. You can watch everything they do, but nobody here can see you."
+        description={
+          note
+            ? note.text
+            : "The characters here get on with their lives on their own. You can watch everything they do, but nobody here can see you."
+        }
         footer={
           <>
             {OWN_WORLD.map(({ link, label }) => (
-              <a
+              <Button
                 key={link.title}
-                href={link.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={buttonClass({ tone: "ghost" })}
+                tone="ghost"
+                icon={<SocialGlyph link={link} />}
+                render={
+                  <a href={link.href} target="_blank" rel="noopener noreferrer" />
+                }
               >
-                <SocialGlyph link={link} />
                 {label}
-              </a>
+              </Button>
             ))}
-            <DialogClose className={buttonClass({ tone: "soft" })}>
+            <DialogClose render={<Button tone="soft" />}>
               Start watching
             </DialogClose>
           </>
         }
       >
-        {note ? (
-          <section className="flex flex-col gap-2 rounded-[1rem] bg-ui-accent-tint px-4 py-3.5">
-            {note.title ? (
-              <h3 className="text-[0.9375rem] font-extrabold">{note.title}</h3>
-            ) : null}
-            <p className="text-sm leading-normal text-pretty whitespace-pre-line">
-              {note.text}
-            </p>
-            {note.link ? (
+        {note?.link ? (
+          <Button
+            tone="primary"
+            className="self-start"
+            icon={<ExternalLinkIcon aria-hidden />}
+            render={
               <a
                 href={note.link.href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={buttonClass({
-                  tone: "primary",
-                  className: "self-start",
-                })}
-              >
-                {note.link.label}
-                <ExternalLinkIcon aria-hidden />
-              </a>
-            ) : null}
-          </section>
+              />
+            }
+          >
+            {note.link.label}
+          </Button>
         ) : null}
       </DialogPanel>
     </Dialog>
