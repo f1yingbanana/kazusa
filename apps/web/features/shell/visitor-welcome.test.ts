@@ -48,7 +48,7 @@ afterEach(() => {
 });
 
 describe("the visitor welcome", () => {
-  it("leads with this install's own note, and its link", async () => {
+  it("is this install's own note: its title, text and link", async () => {
     mocks.note = {
       title: "Talk to them on Discord",
       text: "Message one student at a time.",
@@ -56,8 +56,9 @@ describe("the visitor welcome", () => {
     };
     render(createElement(VisitorWelcome));
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText("You're watching Kivotos")).toBeDefined();
+    expect(within(dialog).queryByText("You're watching Kivotos")).toBeNull();
     expect(within(dialog).getByText("Talk to them on Discord")).toBeDefined();
+    expect(within(dialog).getByText("Message one student at a time.")).toBeDefined();
     const link = within(dialog).getByRole("link", { name: "Join the Discord" });
     expect(link.getAttribute("href")).toBe("https://discord.gg/abc");
   });
@@ -67,8 +68,9 @@ describe("the visitor welcome", () => {
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).queryByText(/Talk to them/)).toBeNull();
     expect(
-      within(dialog).getByRole("link", { name: /Make your own/ }),
+      within(dialog).getByRole("link", { name: "GitHub" }),
     ).toBeDefined();
+    expect(within(dialog).getByRole("link", { name: "Discord" })).toBeDefined();
   });
 
   it("is never shown to someone who can play", () => {

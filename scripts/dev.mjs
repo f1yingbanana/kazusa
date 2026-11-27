@@ -456,6 +456,14 @@ function start(name, command, args, options) {
   });
   child.once("exit", (code) => {
     children.delete(name);
+    // The frontend holds no state, but a browser's open connection keeps its
+    // graceful shutdown waiting. Once the Gateway has stopped, force the rest.
+    if (stopping && name === "gateway") {
+      const force = setTimeout(() => {
+        for (const other of children.values()) other.kill("SIGKILL");
+      }, 5000);
+      force.unref();
+    }
     if (name === "gateway" && gatewayStopped) {
       gatewayStopped(code);
       return;
