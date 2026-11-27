@@ -446,6 +446,7 @@ ShowInstDetails nevershow
   RMDir /r "$INSTDIR\\apps\\web"
   RMDir /r "$INSTDIR\\apps\\kazusa\\plugins"
   RMDir /r "$INSTDIR\\apps\\kazusa\\shared"
+  RMDir /r "$INSTDIR\\apps\\kazusa\\starter"
   Delete "$INSTDIR\\apps\\kazusa\\base.json"
   Delete "$INSTDIR\\apps\\kazusa\\world-sources.json"
   Delete "$INSTDIR\\apps\\kazusa\\package.json"

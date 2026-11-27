@@ -525,6 +525,10 @@ export const WorldPackageSchema = z.looseObject({
      * `groups`.
      */
     defaultGroup: z.string().optional(),
+    /** Multiple groups whose members start active by default. */
+    defaultGroups: z.array(z.string()).optional(),
+    /** Individual character ids recommended to start active by default. */
+    defaultCharacters: z.array(z.string()).optional(),
     /**
      * The character the setup guide picks for the person to play (they can pick
      * another, or nobody). Saved as `config.user.defaultCharacter`.

@@ -148,7 +148,7 @@ function NewPageForm({
     try {
       if (character) {
         await change(() => createCharacter({ id, name: named }));
-        toast.success(`${named} joined the world, offstage`);
+        toast.success(`${named} joined the world, inactive`);
         onDone();
         void setParams({ ...wikiPatch(null), ...profilePatch(id) });
         return;

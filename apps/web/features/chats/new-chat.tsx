@@ -73,7 +73,7 @@ function NewChatForm({
         near.has(one.id)
           ? "Here with you"
           : one.offstage
-            ? "Offstage: won't reply right away"
+            ? "Inactive: won't reply right away"
             : undefined,
       );
     return [
@@ -82,7 +82,7 @@ function NewChatForm({
         label: "Everyone",
         items: cast.filter((c) => !near.has(c.id) && !c.offstage),
       },
-      { label: "Offstage", items: cast.filter((c) => c.offstage) },
+      { label: "Inactive", items: cast.filter((c) => c.offstage) },
     ]
       .map((group) => ({ label: group.label, items: group.items.map(item) }))
       .filter((group) => group.items.length > 0);

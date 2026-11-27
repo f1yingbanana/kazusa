@@ -331,7 +331,7 @@ export function CharacterActions({
                       })
                     }
                   >
-                    {offstage ? "Bring onstage" : "Send offstage"}
+                    {offstage ? "Make active" : "Make inactive"}
                   </MenuItem>
                 </>
               ) : null}

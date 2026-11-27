@@ -2,15 +2,3 @@
 
 @import "tailwindcss";
 @import "../ui/tailwind.css";
-@import "./shadcn.css";
-
-/*
-  ui-sdk marks a selected item by the bare attribute (data-selected=""); the
-  shadcn sheet above matches only data-selected="true". Match both, so
-  data-selected: works in ui/ and features/ (delete with shadcn.css).
-*/
-@custom-variant data-selected {
-  &:where([data-selected]:not([data-selected="false"])) {
-    @slot;
-  }
-}

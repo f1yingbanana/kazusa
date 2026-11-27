@@ -83,7 +83,7 @@ export function Desires({ id }: { id: string }) {
       title="How they feel"
       meta={
         offstage ? (
-          <Tooltip label="Desires stop changing while a character is offstage.">
+          <Tooltip label="Desires stop changing while a character is inactive.">
             <span
               tabIndex={0}
               className="inline-flex items-center gap-1 rounded-full bg-ui-tint px-2 py-px font-bold outline-none focus-visible:outline-2 focus-visible:outline-ui-primary"
@@ -154,7 +154,7 @@ function DesireTile({
     : drop
       ? `Turns ${drop.state} in ${formatSimDuration(drop.at - at)}`
       : paused
-        ? "Holding while offstage"
+        ? "Holding while inactive"
         : undefined;
   const TrendIcon = trend?.direction === "down" ? ArrowDownIcon : ArrowUpIcon;
 

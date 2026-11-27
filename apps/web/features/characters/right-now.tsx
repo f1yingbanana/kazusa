@@ -40,8 +40,8 @@ export function RightNow({
   const empty =
     status?.onstage === false
       ? status.queued > 0
-        ? `Offstage. ${status.queued} waiting for when they're back.`
-        : "Offstage: not simulated until they're back."
+        ? `Inactive. ${status.queued} waiting for when they're back.`
+        : "Inactive: not simulated until they're back."
       : !task && !position
         ? character.kind === "npc"
           ? "Not simulated: no activity or position."

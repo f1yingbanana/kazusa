@@ -44,8 +44,8 @@
   `muted` (secondary text, borders), and one `accent`. World metadata may
   override `accent`. Status colors reuse the accent and muted tokens plus a
   single `destructive` for errors. No purple or violet, and no gradients.
-- **Type:** Geist (UI and body, ≥ 14px) and Geist Mono (sim times, IDs, counts,
-  durations).
+- **Type:** `M PLUS Rounded 1c` (`--ui-font-face`) with `tabular-nums` for sim
+  times, IDs, counts, and durations.
 - **Presence ring (the signature element):** a ring around every avatar,
   encoding _structured_ state only.
 
@@ -185,8 +185,7 @@ The map, always; the sidebar says who is where.
 
 ## 6. Stage: Chats
 
-The existing chat experience (contract in `kazusa/references/client.md`),
-rehoused as a stage view.
+Each chat conversation opens inside its dedicated view (`features/chats/`).
 
 - **List sections:** **Mine** (the player is a member: composable, typing, the
   current behavior) and **Observed** (all other canonical chats through
@@ -504,8 +503,8 @@ wakes, token/cost meter (Observer debug), notifications and mentions.
   top bar.
 - The roster is a left sheet and the inspector a bottom sheet (snap points 50% /
   90%).
-- Dialogs open as sheets from the bottom (`ResponsiveDialogContent`), capped at
-  85% of the screen.
+- Dialogs open as sheets from the bottom (`DialogPanel` / `AlertPanel` in
+  `ui/dialog.tsx`), capped at `calc(100dvh - 3rem)` on mobile.
 - Status items fold into a top-bar overflow menu.
 - The timeline overview strip collapses to a thin scrubber. Compare mode is
   limited to 3 pins.

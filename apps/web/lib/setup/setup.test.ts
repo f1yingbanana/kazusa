@@ -232,10 +232,11 @@ describe("setup", () => {
       "starter",
     ]);
     expect(status.worlds[0]?.characters).toEqual([
-      { id: "ann", name: "Ann Lee" },
-      { id: "bo", name: "bo" },
-      { id: "cy", name: "cy" },
+      { id: "ann", name: "Ann Lee", groups: ["crew", "Port"] },
+      { id: "bo", name: "bo", groups: ["crew", "Port"] },
+      { id: "cy", name: "cy", groups: ["lone", "Port"] },
     ]);
+    expect(status.worlds[0]?.groupNames).toEqual({ crew: "The Crew" });
     expect(status.worlds[1]?.characters).toEqual([]);
   });
 
@@ -299,6 +300,55 @@ describe("setup", () => {
       "Ann Lee",
     );
     expect(world?.defaultCast).toEqual(["ann", "bo"]);
+  });
+
+  it("reads character summaries, aliases, workspace avatars, defaultGroup by display name, and defaultUserCharacter", async () => {
+    const template = path.join(app, "worlds", "cast-world", "package.json");
+    const pkg = JSON.parse(readFileSync(template, "utf8")) as {
+      kazusa: Record<string, unknown>;
+    };
+    pkg.kazusa.defaultGroup = "The Crew";
+    pkg.kazusa.defaultUserCharacter = "bo";
+    writeFileSync(template, JSON.stringify(pkg));
+    write(
+      path.join(
+        app,
+        "worlds/cast-world/shared/wiki/entities/characters/ann.md",
+      ),
+      [
+        "---",
+        "name: Ann Lee",
+        "aliases: [Annie, A.L.]",
+        "summary: First mate of [[crew]] at [[Port]].",
+        "in:",
+        "  crew: close",
+        "  Port: knows",
+        "---",
+        "",
+        "Ann steers the ship.",
+      ].join("\n"),
+    );
+    write(
+      path.join(app, "worlds/cast-world/workspaces/ann/avatar.png"),
+      "fake-png",
+    );
+
+    const setup = createSetupHere(app);
+    const world = await setup.prepare("cast-world");
+    expect(world.defaultCast).toEqual(["ann", "bo"]);
+    expect(world.defaultUserCharacter).toBe("bo");
+    const ann = world.characters.find(({ id }) => id === "ann");
+    expect(ann).toMatchObject({
+      id: "ann",
+      name: "Ann Lee",
+      summary: "First mate of The Crew at Port.",
+      aliases: ["Annie", "A.L."],
+      groups: ["crew", "Port"],
+    });
+    expect(ann?.avatarUrl).toMatch(/^\/setup\/avatar\?id=ann&v=/);
+    const avatar = await setup.avatar("ann");
+    expect(avatar?.contentType).toBe("image/png");
+    expect(await setup.avatar("../escape")).toBeUndefined();
   });
 
   it("makes a world from the choices, keeping the template untouched", async () => {
@@ -502,9 +552,69 @@ describe("setup", () => {
     expect(setup.downloads()).toEqual({ progress: null });
   });
 
+  it("combines defaultGroup, defaultGroups, and defaultCharacters into defaultCast", async () => {
+    const template = path.join(app, "worlds", "cast-world", "package.json");
+    const pkg = JSON.parse(readFileSync(template, "utf8")) as {
+      kazusa: Record<string, unknown>;
+    };
+    pkg.kazusa.defaultGroup = undefined;
+    pkg.kazusa.defaultGroups = ["crew"];
+    pkg.kazusa.defaultCharacters = ["cy", "missing-id"];
+    writeFileSync(template, JSON.stringify(pkg));
+
+    const setup = createSetupHere(app);
+    const castWorld = await setup.prepare("cast-world");
+    expect(castWorld.defaultCast).toEqual(["ann", "bo", "cy"]);
+  });
+
   it("refuses a world that does not exist", async () => {
     await expect(
       createSetupHere(app).apply({ world: "../../etc", cast: [] }),
     ).rejects.toThrow("Unknown world");
+  });
+
+  it("treats bundled worlds as ready without reading an unrelated live folder and cancels downloads cleanly", async () => {
+    let aborted = false;
+    let release = () => {};
+    const hold = new Promise<void>((resolve) => (release = resolve));
+    const catalog: Catalog = {
+      list: async () => [
+        {
+          id: "starter",
+          downloaded: true,
+          bundled: true,
+          package: {
+            name: "starter",
+            version: "0.3.0",
+            description: "Empty starter.",
+            kazusa: { title: "Start from scratch", systemAgent: "arona" },
+          },
+        },
+      ],
+      download: async (_id, _onProgress, signal) => {
+        signal?.addEventListener("abort", () => {
+          aborted = true;
+          release();
+        });
+        await hold;
+      },
+    };
+    const setup = createSetup(app, store, catalog);
+    // Even if world/ holds something else, bundled starter reads its own package.
+    write(path.join(app, "world/package.json"), "{}");
+    const { worlds } = await setup.status();
+    expect(worlds[0]).toMatchObject({
+      id: "starter",
+      downloaded: true,
+      title: "Start from scratch",
+      characters: [],
+    });
+
+    const pending = setup.prepare("starter").catch(() => {});
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await setup.cancelDownload();
+    await pending;
+    expect(aborted).toBe(true);
+    expect(setup.downloads()).toEqual({ progress: null });
   });
 });

@@ -158,14 +158,21 @@ export function streamGit(
     readonly cwd: string;
     readonly repo?: string;
     readonly onProgress?: (progress: GitProgress) => void;
+    readonly signal?: AbortSignal;
   },
 ): Promise<void> {
   return new Promise((resolve, reject) => {
+    if (options.signal?.aborted) {
+      reject(new Error("Cancelled."));
+      return;
+    }
     const child = spawn(bin.binary, args, {
       cwd: options.cwd,
       env: options.repo ? pinnedTo(bin, options.repo) : bin.env,
       stdio: ["ignore", "ignore", "pipe"],
     });
+    const onAbort = () => child.kill("SIGTERM");
+    options.signal?.addEventListener("abort", onAbort, { once: true });
     let percent = 0;
     let reported = 0;
     let pending = "";
@@ -196,10 +203,15 @@ export function streamGit(
       pending = parts.pop() ?? "";
       parts.forEach(line);
     });
-    child.once("error", reject);
+    child.once("error", (error) => {
+      options.signal?.removeEventListener("abort", onAbort);
+      reject(error);
+    });
     child.once("close", (code) => {
+      options.signal?.removeEventListener("abort", onAbort);
       line(pending);
-      if (code === 0) resolve();
+      if (options.signal?.aborted) reject(new Error("Cancelled."));
+      else if (code === 0) resolve();
       else
         reject(
           new Error(messages.join(" ") || `git ${args[0]} failed (${code}).`),

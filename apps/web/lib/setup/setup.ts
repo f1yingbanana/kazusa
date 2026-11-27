@@ -4,6 +4,7 @@ import {
   readFile,
   rename,
   rm,
+  stat,
   writeFile,
 } from "node:fs/promises";
 import { execFile } from "node:child_process";
@@ -187,23 +188,33 @@ export interface CharacterGroup {
   readonly ids: readonly string[];
 }
 
+export interface WorldCharacter {
+  readonly id: string;
+  readonly name: string;
+  readonly summary?: string;
+  readonly aliases?: readonly string[];
+  readonly avatarUrl?: string;
+  readonly groups?: readonly string[];
+}
+
 export interface WorldOption {
   readonly id: string;
   /** Cloned into `world/`; until then only its `package.json` is known. */
   readonly downloaded: boolean;
+  /** Included right inside the app, needing no download (`"starter"`). */
+  readonly bundled?: boolean;
   readonly title: string;
   readonly description: string;
   readonly systemAgent: string;
   /** Everyone but the system agent; none means there's no cast to choose. */
-  readonly characters: readonly {
-    readonly id: string;
-    readonly name: string;
-  }[];
+  readonly characters: readonly WorldCharacter[];
   /** One list per anchor (Schools, Clubs), broadest first. */
   readonly groups: readonly {
     readonly field: string;
     readonly groups: readonly CharacterGroup[];
   }[];
+  /** Group id -> display name from `shared/wiki/concepts/<id>.md`. */
+  readonly groupNames?: Readonly<Record<string, string>>;
   readonly defaultCast: readonly string[];
   /** The template's `defaultUserCharacter`, when it is one of `characters`. */
   readonly defaultUserCharacter?: string;
@@ -214,6 +225,7 @@ export type ListedWorld =
   | {
       readonly id: string;
       readonly downloaded: boolean;
+      readonly bundled?: boolean;
       readonly package: unknown;
     }
   | { readonly id: string; readonly error: string };
@@ -229,6 +241,7 @@ export interface Catalog {
   readonly download: (
     id: string,
     onProgress?: (progress: ScriptProgress) => void,
+    signal?: AbortSignal,
   ) => Promise<void>;
 }
 
@@ -238,6 +251,7 @@ const ListedSchema = z.object({
       z.object({
         id: z.string(),
         downloaded: z.boolean(),
+        bundled: z.boolean().optional(),
         package: z.unknown(),
       }),
       z.object({ id: z.string(), error: z.string() }),
@@ -252,8 +266,14 @@ export const scriptCatalog: Catalog = {
     if (!result.ok) throw new Error(result.error);
     return ListedSchema.parse(result.value).worlds;
   },
-  download: async (id, onProgress) => {
-    const result = await runScript("world.mjs", ["clone", id], 0, onProgress);
+  download: async (id, onProgress, signal) => {
+    const result = await runScript(
+      "world.mjs",
+      ["clone", id],
+      0,
+      onProgress,
+      signal,
+    );
     if (!result.ok) throw new Error(result.error);
   },
 };
@@ -275,23 +295,56 @@ async function directories(dir: string): Promise<string[]> {
     .sort();
 }
 
+const AVATAR_TYPES: ReadonlyArray<readonly [string, string]> = [
+  ["webp", "image/webp"],
+  ["png", "image/png"],
+  ["jpg", "image/jpeg"],
+  ["jpeg", "image/jpeg"],
+  ["gif", "image/gif"],
+  ["avif", "image/avif"],
+];
+
+const SAFE_ID = /^[a-z0-9][a-z0-9._-]*$/i;
+
+export interface SetupAvatar {
+  readonly file: string;
+  readonly contentType: string;
+  readonly size: number;
+  readonly mtimeMs: number;
+}
+
+async function findAvatar(
+  workspaces: string,
+  id: string,
+): Promise<SetupAvatar | undefined> {
+  if (!SAFE_ID.test(id)) return undefined;
+  const dir = path.join(workspaces, id);
+  for (const [ext, contentType] of AVATAR_TYPES) {
+    const file = path.join(dir, `avatar.${ext}`);
+    try {
+      const info = await stat(file);
+      if (info.isFile())
+        return { file, contentType, size: info.size, mtimeMs: info.mtimeMs };
+    } catch {
+      // Try next extension
+    }
+  }
+  return undefined;
+}
+
+async function readCard(wiki: string, id: string): Promise<string | undefined> {
+  return (
+    (await readIfPresent(path.join(wiki, "characters", `${id}.md`))) ??
+    (await readIfPresent(path.join(wiki, "entities/characters", `${id}.md`)))
+  );
+}
+
 /**
  * A character's name: their World Wiki page's, else (for the system agent, who
  * keeps her own files) their `IDENTITY.md`'s, else their id.
  */
 async function characterName(workspaces: string, id: string): Promise<string> {
-  const page =
-    (await readIfPresent(
-      path.join(workspaces, "..", "shared/wiki/characters", `${id}.md`),
-    )) ??
-    (await readIfPresent(
-      path.join(
-        workspaces,
-        "..",
-        "shared/wiki/entities/characters",
-        `${id}.md`,
-      ),
-    ));
+  const page = await readCard(path.join(workspaces, "..", "shared/wiki"), id);
   const identity = page
     ? undefined
     : await readIfPresent(path.join(workspaces, id, "IDENTITY.md"));
@@ -307,6 +360,42 @@ const frontmatterField = (text: string, field: string): string | undefined =>
 
 const readIfPresent = async (file: string): Promise<string | undefined> =>
   existsSync(file) ? readFile(file, "utf8") : undefined;
+
+function plainWiki(
+  text: string,
+  labels: Readonly<Record<string, string>>,
+): string {
+  return text
+    .replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g, "$2")
+    .replace(/\[\[([^\]]+)\]\]/g, (_, ref: string) => labels[ref] ?? ref)
+    .trim();
+}
+
+function openingParagraph(text: string): string | undefined {
+  const body = text.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "");
+  const paragraphs: string[] = [];
+  let current: string[] = [];
+  for (const raw of body.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line) {
+      if (current.length) {
+        paragraphs.push(current.join(" "));
+        current = [];
+      }
+      continue;
+    }
+    if (line.startsWith("#") || line.startsWith("-") || line.startsWith("*")) {
+      if (current.length) {
+        paragraphs.push(current.join(" "));
+        current = [];
+      }
+      continue;
+    }
+    current.push(line);
+  }
+  if (current.length) paragraphs.push(current.join(" "));
+  return paragraphs[0];
+}
 
 /**
  * The groups a character's page puts them in: its `in`, or in a world not yet
@@ -419,24 +508,87 @@ export function createSetup(
     const dir = liveDir;
     const world = await readWorld(dir);
     const workspaces = path.join(dir, "workspaces");
+    const wiki = path.join(dir, "shared/wiki");
     const ids = (await directories(workspaces)).filter(
       (agent) => agent !== world.kazusa.systemAgent,
     );
+    const cards = new Map<string, string | undefined>();
+    await Promise.all(
+      ids.map(async (agent) => {
+        cards.set(agent, await readCard(wiki, agent));
+      }),
+    );
+    const groupRefs = new Set<string>();
+    for (const card of cards.values()) {
+      if (!card) continue;
+      for (const ref of groupsIn(card)) groupRefs.add(ref);
+    }
+    const groupNames: Record<string, string> = {};
+    await Promise.all(
+      [...groupRefs].map(async (ref) => {
+        const page = await readIfPresent(
+          path.join(wiki, "concepts", `${ref}.md`),
+        );
+        const label = page && frontmatterField(page, "name");
+        if (label) groupNames[ref] = label;
+      }),
+    );
     const named = await Promise.all(
-      ids.map(async (agent) => ({
-        id: agent,
-        name: await characterName(workspaces, agent),
-      })),
+      ids.map(async (agent): Promise<WorldCharacter> => {
+        const card = cards.get(agent);
+        const identity = card
+          ? undefined
+          : await readIfPresent(path.join(workspaces, agent, "IDENTITY.md"));
+        const name =
+          (card && frontmatterField(card, "name")) ??
+          (identity && frontmatterField(identity, "name")) ??
+          agent;
+        const rawSummary = card
+          ? (frontmatterField(card, "summary") ?? openingParagraph(card))
+          : undefined;
+        const summary = rawSummary
+          ? plainWiki(rawSummary, groupNames)
+          : undefined;
+        const aliases = card
+          ? entriesOf(card, "aliases")
+              .map(([value]) => value)
+              .filter(Boolean)
+          : [];
+        const groups = card ? groupsIn(card) : [];
+        const avatar = await findAvatar(workspaces, agent);
+        const avatarUrl = avatar
+          ? `/setup/avatar?id=${encodeURIComponent(agent)}&v=${Math.trunc(avatar.mtimeMs).toString(36)}`
+          : undefined;
+        return {
+          id: agent,
+          name,
+          ...(summary ? { summary } : {}),
+          ...(aliases.length ? { aliases } : {}),
+          ...(avatarUrl ? { avatarUrl } : {}),
+          ...(groups.length ? { groups } : {}),
+        };
+      }),
     );
     const characters = named.toSorted((a, b) => a.name.localeCompare(b.name));
-    const fields = ids.length
-      ? await characterGroups(path.join(dir, "shared/wiki"), ids)
-      : [];
-    const defaultCast =
-      fields
-        .flatMap(({ groups }) => groups)
-        .find(({ value }) => value === world.kazusa.defaultGroup)?.ids ?? [];
-    const playAs = world.kazusa.defaultUserCharacter;
+    const fields = ids.length ? await characterGroups(wiki, ids) : [];
+    const defaultGroupKeys = [
+      ...(world.kazusa.defaultGroup ? [world.kazusa.defaultGroup] : []),
+      ...(world.kazusa.defaultGroups ?? []),
+    ];
+    const allGroups = fields.flatMap(({ groups }) => groups);
+    const defaultCast = [
+      ...new Set([
+        ...defaultGroupKeys.flatMap(
+          (key) =>
+            allGroups.find(({ value, name }) => value === key || name === key)
+              ?.ids ?? [],
+        ),
+        ...(world.kazusa.defaultCharacters ?? [])
+          .map((one) => one.trim())
+          .filter((one) => characters.some(({ id: charId }) => charId === one)),
+      ]),
+    ];
+    const playAs = world.kazusa.defaultUserCharacter?.trim();
     return {
       id,
       downloaded: true,
@@ -451,6 +603,7 @@ export function createSetup(
           ids: members,
         })),
       })),
+      ...(Object.keys(groupNames).length ? { groupNames } : {}),
       defaultCast,
       ...(playAs && characters.some(({ id: one }) => one === playAs)
         ? { defaultUserCharacter: playAs }
@@ -458,7 +611,7 @@ export function createSetup(
     };
   }
 
-  /** Downloaded: the whole option. Not yet: what its `package.json` says. */
+  /** Downloaded: the whole option. Not yet (or bundled): from `package.json`. */
   async function listedOption(
     listed: ListedWorld,
   ): Promise<WorldOption | undefined> {
@@ -466,12 +619,13 @@ export function createSetup(
       console.warn(`Couldn't list the ${listed.id} world: ${listed.error}`);
       return undefined;
     }
-    if (listed.downloaded) return worldOption(listed.id);
+    if (listed.downloaded && !listed.bundled) return worldOption(listed.id);
     const world = WorldPackageSchema.safeParse(listed.package).data;
     if (!world) return undefined;
     return {
       id: listed.id,
-      downloaded: false,
+      downloaded: listed.downloaded,
+      ...(listed.bundled ? { bundled: true } : {}),
       title: world.kazusa.title ?? world.displayName ?? world.name,
       description: world.description ?? "",
       systemAgent: world.kazusa.systemAgent,
@@ -481,32 +635,59 @@ export function createSetup(
     };
   }
 
-  // A second request for a world downloading waits for the same download.
-  const cloning = new Map<string, Promise<void>>();
+  let active:
+    | {
+        readonly id: string;
+        readonly controller: AbortController;
+        readonly done: Promise<void>;
+      }
+    | undefined;
   let progress: WorldDownload | undefined;
+
+  async function cancelDownload(): Promise<void> {
+    const running = active;
+    if (!running) return;
+    running.controller.abort();
+    await running.done.catch(() => {});
+  }
 
   /**
    * Downloads the world the player picked straight into `world/`, for its cast:
    * a clone of its newest release, git's progress kept for the guide.
    */
-  async function prepare(id: string): Promise<WorldOption> {
-    const pending =
-      cloning.get(id) ??
-      catalog
+  async function prepare(
+    id: string,
+    signal?: AbortSignal,
+  ): Promise<WorldOption> {
+    if (active && active.id !== id) await cancelDownload();
+    let current = active;
+    if (!current || current.id !== id || current.controller.signal.aborted) {
+      const controller = new AbortController();
+      const done = catalog
         .download(
           id,
           tracking((download) => {
-            progress = download;
+            if (!controller.signal.aborted) progress = download;
           }),
+          controller.signal,
         )
         .finally(() => {
-          progress = undefined;
+          if (active === current) {
+            active = undefined;
+            progress = undefined;
+          }
         });
-    cloning.set(id, pending);
+      current = { id, controller, done };
+      active = current;
+    }
+    const onAbort = () => {
+      if (active === current) current.controller.abort();
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
     try {
-      await pending;
+      await current.done;
     } finally {
-      cloning.delete(id);
+      signal?.removeEventListener("abort", onAbort);
     }
     return worldOption(id);
   }
@@ -721,8 +902,10 @@ export function createSetup(
     startOver,
     status,
     prepare,
+    cancelDownload,
     apply,
     downloads,
+    avatar: (id: string) => findAvatar(path.join(liveDir, "workspaces"), id),
     files: { config: configFile, env: envFile },
   };
 }
@@ -730,7 +913,9 @@ export function createSetup(
 // Untraced: Turbopack would otherwise watch everything under the live world,
 // whose state the Gateway writes all the time, and reload every open page.
 export const setup = createSetup(
-  path.resolve(/* turbopackIgnore: true */ process.cwd(), "../kazusa"),
+  process.env.KAZUSA_APP_DIR
+    ? path.resolve(/* turbopackIgnore: true */ process.env.KAZUSA_APP_DIR)
+    : path.resolve(/* turbopackIgnore: true */ process.cwd(), "../kazusa"),
 );
 
 /** The template's `config.user`, less any character it would start as. */

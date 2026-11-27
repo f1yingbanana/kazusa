@@ -204,13 +204,13 @@ export function WhosWhere({ onNavigated }: { onNavigated?: () => void }) {
           ) : favorites ? (
             favorite.size ? (
               <EmptySeats title="No favorites around">
-                Nobody you&apos;ve favorited is onstage right now.
+                Nobody you&apos;ve favorited is active right now.
               </EmptySeats>
             ) : (
               <EmptySeats title="No favorites yet">{NO_FAVORITES}</EmptySeats>
             )
           ) : (
-            <Note inset="list">Nobody is onstage yet.</Note>
+            <Note inset="list">Nobody is active yet.</Note>
           )
         ) : (
           places.map((place) => (
