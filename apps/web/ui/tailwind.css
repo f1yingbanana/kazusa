@@ -60,6 +60,8 @@
   --animate-ui-turn: ui-turn 6s linear infinite;
   --animate-ui-spin: ui-turn 1s linear infinite;
   --animate-ui-blink: ui-blink 1s ease-in-out infinite;
+  --animate-ui-indeterminate: ui-indeterminate 1.4s cubic-bezier(0.4, 0, 0.2, 1)
+    infinite;
   --animate-ui-enter: ui-enter 220ms cubic-bezier(0.2, 0.9, 0.3, 1);
   --animate-ui-ping: ui-ping 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
   --animate-ui-ripple: ui-ripple 700ms cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
@@ -83,6 +85,9 @@
     forwards;
   --animate-ui-pane-in: ui-pane-in 220ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
   --animate-ui-pane-back: ui-pane-back 220ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
+  --animate-ui-step-forward: ui-step-forward 260ms
+    cubic-bezier(0.2, 0.9, 0.3, 1) both;
+  --animate-ui-step-back: ui-step-back 260ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
 
   @keyframes ui-pulse {
     50% {
@@ -97,6 +102,14 @@
   @keyframes ui-blink {
     50% {
       opacity: 0.3;
+    }
+  }
+  @keyframes ui-indeterminate {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(300%);
     }
   }
   @keyframes ui-ping {
@@ -271,6 +284,18 @@
     from {
       opacity: 0.4;
       translate: -30% 0;
+    }
+  }
+  @keyframes ui-step-forward {
+    from {
+      opacity: 0;
+      translate: 1rem 0;
+    }
+  }
+  @keyframes ui-step-back {
+    from {
+      opacity: 0;
+      translate: -1rem 0;
     }
   }
 }

@@ -298,8 +298,8 @@ function NoMap() {
       </span>
       <h2 className="text-lg font-extrabold">No map yet</h2>
       <p className="max-w-xs text-sm text-ui-soft">
-        Places added to this world appear here, with everyone onstage where they
-        are.
+        Places added to this world appear here, with every active character
+        where they are.
       </p>
     </div>
   );

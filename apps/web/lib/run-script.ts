@@ -30,13 +30,20 @@ export function runScript(
   args: readonly string[],
   timeout: number,
   onProgress?: (progress: ScriptProgress) => void,
+  signal?: AbortSignal,
 ): Promise<ScriptResult> {
   return new Promise((resolve) => {
+    if (signal?.aborted) {
+      resolve({ ok: false, error: "Cancelled." });
+      return;
+    }
     const child = spawn(
       process.execPath,
       [path.join(ROOT, "scripts", script), ...args],
       { cwd: ROOT, stdio: ["ignore", "pipe", "pipe"] },
     );
+    const onAbort = () => child.kill("SIGTERM");
+    signal?.addEventListener("abort", onAbort, { once: true });
     let buffered = "";
     let body: Record<string, unknown> | undefined;
     let stderr = "";
@@ -67,13 +74,16 @@ export function runScript(
       ? setTimeout(() => child.kill("SIGTERM"), timeout)
       : undefined;
     child.on("error", (error) => {
+      signal?.removeEventListener("abort", onAbort);
       if (timer) clearTimeout(timer);
       resolve({ ok: false, error: error.message });
     });
     child.on("close", (code) => {
+      signal?.removeEventListener("abort", onAbort);
       if (timer) clearTimeout(timer);
       take(buffered);
-      if (code === 0 && body) resolve({ ok: true, value: body });
+      if (signal?.aborted) resolve({ ok: false, error: "Cancelled." });
+      else if (code === 0 && body) resolve({ ok: true, value: body });
       else
         resolve({
           ok: false,

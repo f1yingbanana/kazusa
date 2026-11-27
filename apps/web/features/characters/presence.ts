@@ -8,7 +8,7 @@ export const PRESENCE_TEXT: Record<Presence, string> = {
   idle: "Awake",
   thinking: "Thinking",
   composing: "Typing",
-  offstage: "Offstage",
+  offstage: "Inactive",
   unknown: "",
 };
 

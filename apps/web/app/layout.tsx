@@ -1,11 +1,9 @@
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { Analytics } from "@vercel/analytics/next";
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, M_PLUS_Rounded_1c } from "next/font/google";
+import { M_PLUS_Rounded_1c } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({ subsets: ["latin"], variable: "--font-sans" });
-const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" });
 const rounded = M_PLUS_Rounded_1c({
   subsets: ["latin"],
   weight: ["400", "500", "700", "800"],
@@ -35,11 +33,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} bg-background`}
-    >
-      <body className="font-sans antialiased">
+    <html lang="en" className="bg-ui-ground">
+      <body className="antialiased">
         {/* The theme reads the typeface on <html>, where portaled popups see it too. */}
         <style href="ui-font-face" precedence="default">
           {`html{--ui-font-face:${rounded.style.fontFamily}}`}

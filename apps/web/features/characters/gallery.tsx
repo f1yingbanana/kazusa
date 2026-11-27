@@ -137,7 +137,7 @@ export function Gallery({
         <div className="me-auto flex min-w-0 items-baseline gap-2 max-sm:w-full">
           <h1 className="text-[1.375rem] font-extrabold">Characters</h1>
           <p className="text-sm font-bold text-ui-soft tabular-nums">
-            {`${onstageCount} of ${cast.length} onstage`}
+            {`${onstageCount} of ${cast.length} active`}
           </p>
         </div>
         <SearchInput
@@ -169,10 +169,10 @@ export function Gallery({
             Everyone
           </SegmentedItem>
           <SegmentedItem value="onstage" className="max-sm:px-2">
-            Onstage
+            Active
           </SegmentedItem>
           <SegmentedItem value="offstage" className="max-sm:px-2">
-            Offstage
+            Inactive
           </SegmentedItem>
           <SegmentedItem value="favorites" className="max-sm:px-2">
             Favorites
@@ -219,7 +219,7 @@ export function Gallery({
                     setStageRequest({ label: "", cast, intent: "choose" })
                   }
                 >
-                  {"Who's onstage…"}
+                  {"Who's active…"}
                 </MenuItem>
               ) : null}
               {canPlay ? (
@@ -246,13 +246,13 @@ export function Gallery({
             ) : show === "favorites" ? (
               <EmptySeats title="No favorites yet">{NO_FAVORITES}</EmptySeats>
             ) : show === "offstage" ? (
-              <EmptySeats title="Nobody offstage">
-                Everyone is onstage, thinking and acting.
+              <EmptySeats title="Nobody inactive">
+                Everyone is active, thinking and acting.
               </EmptySeats>
             ) : show === "onstage" ? (
-              <EmptySeats title="Nobody onstage">
+              <EmptySeats title="Nobody active">
                 {canStage
-                  ? "Bring people on from Who's onstage in the ⋯ menu."
+                  ? "Activate people from Who's active in the ⋯ menu."
                   : "Nobody is being simulated right now."}
               </EmptySeats>
             ) : (
@@ -399,7 +399,7 @@ function GroupHead({
             render={
               <button
                 type="button"
-                aria-label={`Onstage in ${label}`}
+                aria-label={`Active in ${label}`}
                 className="absolute inset-e-0 top-0 grid size-5 place-items-center rounded-full bg-ui-surface/90 text-ui-soft opacity-0 shadow-ui backdrop-blur-xs transition-opacity group-hover/head:opacity-100 hover:bg-ui-tint hover:text-ui-ink focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-ui-primary pointer-coarse:opacity-100 data-open:bg-ui-tint data-open:opacity-100"
               />
             }
@@ -412,7 +412,7 @@ function GroupHead({
               disabled={!cast.someOff}
               onSelect={() => cast.onCast("onstage")}
             >
-              Bring all onstage
+              Make all active
             </MenuItem>
             <MenuSeparator />
             <MenuItem
@@ -420,7 +420,7 @@ function GroupHead({
               disabled={!cast.someOn}
               onSelect={() => cast.onCast("offstage")}
             >
-              Send all offstage
+              Make all inactive
             </MenuItem>
           </MenuContent>
         </Menu>

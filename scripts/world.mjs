@@ -41,13 +41,14 @@ import {
   text,
 } from "../apps/kazusa/plugins/kazusa/src/world/git.ts";
 import {
+  cloneRelease,
   commitOf,
   compareVersions,
   contains,
-  cloneRelease,
   downloaded,
   fetchRelease,
   githubRepo,
+  initBundledClone,
   isClone,
   newestRemoteRelease,
   originOf,
@@ -63,14 +64,31 @@ import {
 } from "../apps/kazusa/plugins/kazusa/src/world/saves.ts";
 
 /** Which worlds there are and where each lives; later, providers such as OpenRP. */
+const appDir = (root) =>
+  process.env.KAZUSA_APP_DIR
+    ? path.resolve(process.env.KAZUSA_APP_DIR)
+    : path.join(root, "apps/kazusa");
 export const SOURCES = "apps/kazusa/world-sources.json";
 export const WORLD = "apps/kazusa/world";
+const STARTER_ID = "starter";
+const STARTER_ORIGIN = "https://github.com/f1yingbanana/kazusa-new-world.git";
 
 const readJson = (file) => JSON.parse(readFileSync(file, "utf8"));
 
+/** Bundled "Start from scratch" world directory when present in the app. */
+function bundledStarter(root) {
+  for (const candidate of [
+    path.join(appDir(root), STARTER_ID),
+    path.join(root, "apps/kazusa/starter"),
+  ]) {
+    if (existsSync(path.join(candidate, "package.json"))) return candidate;
+  }
+  return undefined;
+}
+
 /** `[{ id, provider, url }]`: the worlds this copy offers. */
 export function readSources(root) {
-  const file = path.join(root, SOURCES);
+  const file = path.join(appDir(root), "world-sources.json");
   return existsSync(file) ? (readJson(file).worlds ?? []) : [];
 }
 
@@ -119,10 +137,11 @@ async function peek(bin, url) {
  */
 export async function listWorlds(root) {
   const bin = gitOrFail(root);
-  const world = path.join(root, WORLD);
+  const world = path.join(appDir(root), "world");
   const here = clonedFrom(bin, world);
-  return Promise.all(
-    readSources(root).map(async ({ id, url }) => {
+  const sources = readSources(root);
+  const remote = await Promise.all(
+    sources.map(async ({ id, url }) => {
       try {
         return here === url
           ? {
@@ -137,6 +156,25 @@ export async function listWorlds(root) {
       }
     }),
   );
+  const starter = bundledStarter(root);
+  if (starter && !sources.some((entry) => entry.id === STARTER_ID)) {
+    remote.push({
+      id: STARTER_ID,
+      url: STARTER_ORIGIN,
+      downloaded: true,
+      bundled: true,
+      package: readJson(
+        path.join(
+          here === STARTER_ORIGIN &&
+            existsSync(path.join(world, "package.json"))
+            ? world
+            : starter,
+          "package.json",
+        ),
+      ),
+    });
+  }
+  return remote;
 }
 
 /**
@@ -166,20 +204,33 @@ const CLONED = [".git", "package.json", "shared", "workspaces"];
  * what this machine already keeps there (`.state/`, the Gateway's token) stays.
  * A world already set up is never replaced; another pick that wasn't is.
  */
-export async function cloneWorld(root, id, report) {
-  const source = readSources(root).find((entry) => entry.id === id);
-  if (!source) throw new Error(`No world ${id} is listed.`);
+export async function cloneWorld(root, id, report, signal) {
   const bin = gitOrFail(root);
-  const world = path.join(root, WORLD);
-  if (clonedFrom(bin, world) === source.url) return;
+  const world = path.join(appDir(root), "world");
+  const starter = id === STARTER_ID ? bundledStarter(root) : undefined;
+  const source = readSources(root).find((entry) => entry.id === id);
+  if (!starter && !source) throw new Error(`No world ${id} is listed.`);
+  if (source && clonedFrom(bin, world) === source.url) return;
+  if (starter && clonedFrom(bin, world) === STARTER_ORIGIN) return;
   if (existsSync(path.join(world, "openclaw.json")))
     throw new Error("A world is set up already.");
-  const release = newestRemoteRelease(bin, source.url);
   const partial = `${world}.cloning`;
   rmSync(partial, { recursive: true, force: true });
   mkdirSync(path.dirname(world), { recursive: true });
   try {
-    await cloneRelease(bin, source.url, release?.tag, partial, report);
+    if (starter) {
+      initBundledClone(bin, starter, STARTER_ORIGIN, partial);
+    } else {
+      const release = newestRemoteRelease(bin, source.url);
+      await cloneRelease(
+        bin,
+        source.url,
+        release?.tag,
+        partial,
+        report,
+        signal,
+      );
+    }
   } catch (error) {
     rmSync(partial, { recursive: true, force: true });
     throw error;
@@ -331,11 +382,16 @@ export function liveSaves(root) {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
   const [command, id] = process.argv.slice(2);
+  const controller = new AbortController();
+  process.once("SIGTERM", () => controller.abort());
   const progress = (value) =>
     process.stdout.write(`${JSON.stringify({ progress: value })}\n`);
   const commands = {
     list: async () => ({ worlds: await listWorlds(root) }),
-    clone: async () => (await cloneWorld(root, id, progress), {}),
+    clone: async () => (
+      await cloneWorld(root, id, progress, controller.signal),
+      {}
+    ),
     check: () => checkLiveWorld(root),
     download: async () => (await downloadLiveWorld(root, progress), {}),
     saves: () => liveSaves(root),

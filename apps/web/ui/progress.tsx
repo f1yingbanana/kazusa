@@ -36,7 +36,7 @@ export function ProgressBar({
         )}
       </div>
       <ProgressTrack className="h-2 w-full overflow-hidden rounded-full bg-ui-tint">
-        <ProgressIndicator className="h-full rounded-full bg-ui-primary transition-[width] duration-300 ease-out data-indeterminate:w-1/3 motion-reduce:transition-none" />
+        <ProgressIndicator className="h-full rounded-full bg-ui-primary transition-[width] duration-300 ease-out data-indeterminate:w-1/3 motion-safe:data-indeterminate:animate-ui-indeterminate motion-reduce:transition-none motion-reduce:data-indeterminate:animate-ui-pulse" />
       </ProgressTrack>
     </Root>
   );

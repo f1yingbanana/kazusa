@@ -1,4 +1,11 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import {
   findGit,
@@ -113,6 +120,7 @@ export async function cloneRelease(
   tag: string | undefined,
   into: string,
   onProgress?: (progress: GitProgress) => void,
+  signal?: AbortSignal,
 ): Promise<void> {
   await streamGit(
     bin,
@@ -132,7 +140,7 @@ export async function cloneRelease(
       url,
       path.basename(into),
     ],
-    { cwd: path.dirname(into), onProgress },
+    { cwd: path.dirname(into), onProgress, signal },
   );
   const git = repoGit(bin, into);
   git(["checkout", "--quiet", "-B", PLAY]);
@@ -140,6 +148,29 @@ export async function cloneRelease(
   mkdirSync(path.join(into, ".git/info"), { recursive: true });
   writeFileSync(path.join(into, ".git/info/exclude"), EXCLUDE);
   writeFileSync(path.join(into, ".git/info/attributes"), ATTRIBUTES);
+}
+
+/**
+ * Turns a bundled world folder into a git clone of `url` on `play`, with zero
+ * network access, so dev/saves/updates work identically to remote clones.
+ */
+export function initBundledClone(
+  bin: GitBinary,
+  sourceDir: string,
+  url: string,
+  into: string,
+): void {
+  cpSync(sourceDir, into, { recursive: true });
+  execFileSync(bin.binary, ["init", "--quiet"], { cwd: into, env: bin.env });
+  const git = repoGit(bin, into);
+  git(["checkout", "--quiet", "-B", PLAY]);
+  for (const [key, value] of CONFIG) git(["config", key, value]);
+  git(["remote", "add", "origin", url]);
+  mkdirSync(path.join(into, ".git/info"), { recursive: true });
+  writeFileSync(path.join(into, ".git/info/exclude"), EXCLUDE);
+  writeFileSync(path.join(into, ".git/info/attributes"), ATTRIBUTES);
+  git(["add", "-A"]);
+  git(["commit", "--quiet", "-m", "Initial world"]);
 }
 
 /**

@@ -42,9 +42,9 @@ the picture behind them. A checkpoint's `scene.json`
 1. **We build the scene ourselves and adopt no visual novel engine** (§1).
 2. **The prototype is DOM only**: one `<img>` for the backdrop, one per figure,
    a dialogue box. No canvas, no WebGL, no new dependency.
-3. **The scene is a renderer of a huddle**, chosen with
-   `chats.as=scene|list`. Same chat, same messages, same
-   composer. The transcript is the scene's backlog.
+3. **The scene is a renderer of a huddle**, chosen with `chats.as=scene|list`.
+   Same chat, same messages, same composer. The transcript is the scene's
+   backlog.
 4. **The server keeps pacing.** The floor already makes speech take time, one
    speaker at a time ([floor](../../kazusa/references/floor.md)). The client
    lays out and reveals.
@@ -83,7 +83,7 @@ Its reasons are partly beside the point, so here is the argument from our code.
 | Save, load, rollback                      | Worlds, checkpoints and saves ([worlds](../../kazusa/references/worlds.md) §4). Play is not reversible. | No                |
 | Backlog / history                         | `messages.sqlite`, `GET /kazusa/messages`, the virtualized `MessageList`.                               | No                |
 | Live updates                              | One SSE stream per tab, `LiveHandler` registry.                                                         | No                |
-| Menus, settings, UI chrome                | The shell, registries, shadcn components, URL state.                                                    | No                |
+| Menus, settings, UI chrome                | The shell, `ui/` primitives on `ui-sdk`, `features/`, URL state.                                        | No                |
 | Asset loading                             | Immutable versioned URLs (`/kazusa/avatar`, `/kazusa/sticker`), the browser's image cache.              | No                |
 | **Stage: backdrop, figures, transitions** | Nothing.                                                                                                | This is the gap   |
 | **Text box: name, line, reveal**          | Bubbles only.                                                                                           | This is the gap   |
@@ -308,7 +308,7 @@ lib/scene/pick.ts          pure: backdrop file for (set, state, sim time);
 lib/live/scene-state.ts    Zustand store: scenes by chat id, reading buffer
         │  per-chat selectors, useShallow for collections
         ▼
-SceneRenderer              components/views/chats/scene/*
+SceneRenderer              features/world/scene/*
   dom (M0: <img> + CSS)    later: rigs, three (§9), same props
         ▼
 overlay (DOM, always)      name plate, line, narration, controls
@@ -450,12 +450,12 @@ model → rig → portrait. With none of them the person is not drawn.
 
 ### 5.5 Where it lives in the client
 
-- `components/views/chats/scene/`: `scene-view.tsx`, `dom-renderer.tsx`,
-  `backdrop.tsx`, `figure.tsx`, `dialogue-box.tsx`, `said-text.ts`,
-  `echoes.tsx`, `backlog.tsx`, `scene-switch.tsx`, `use-chat-rendering.ts`,
-  `use-reading-mode.ts`, `use-scene-fullscreen.ts` and
-  `fullscreen-controls.tsx`. The reading-mode toggle sits in `chat-header.tsx`
-  and the full-screen cluster; there is no `reading-controls.tsx`.
+- `features/world/scene/`: `scene-view.tsx`, `dom-renderer.tsx`, `backdrop.tsx`,
+  `figure.tsx`, `dialogue-box.tsx`, `said-text.ts`, `echoes.tsx`, `backlog.tsx`,
+  `scene-switch.tsx`, `use-chat-rendering.ts`, `use-reading-mode.ts`,
+  `use-scene-fullscreen.ts` and `fullscreen-controls.tsx`. The reading-mode
+  toggle sits in `chat-header.tsx` and the full-screen cluster; there is no
+  `reading-controls.tsx`.
 - `lib/scene/`: `state.ts`, `director.ts`, `pick.ts`, `layout.ts`, `reveal.ts`,
   `reading.ts`, `rendering.ts`, `fullscreen.ts`, tests beside each (tables of
   events in, states out).

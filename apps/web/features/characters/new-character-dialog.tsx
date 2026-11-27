@@ -95,9 +95,8 @@ function NewCharacterForm({
     try {
       if (simulated) {
         await change(() => createCharacter({ id, name: named }));
-        toast.success(`${named} joined the cast, offstage`, {
-          description:
-            "Bring them onstage when they're ready to start thinking.",
+        toast.success(`${named} joined the cast, inactive`, {
+          description: "Make them active when they're ready to start thinking.",
         });
         onDone();
         onCharacter(id);
@@ -175,7 +174,7 @@ function NewCharacterForm({
           label="Simulated"
           hint={
             simulated
-              ? "They think, talk and live on their own. They start offstage, costing nothing until brought on."
+              ? "They think, talk and live on their own. They start inactive, costing nothing until made active."
               : "Only a page in the World Wiki: others can know of them, but they never act."
           }
           checked={simulated}

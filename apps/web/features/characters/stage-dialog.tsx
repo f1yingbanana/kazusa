@@ -137,14 +137,14 @@ function StageOne({
   const name = firstName(character.name);
   return on ? (
     <AlertPanel
-      title={`Bring ${name} onstage?`}
+      title={`Make ${name} active?`}
       description={`${name} starts thinking and acting again. ${note}`}
       onConfirm={() => void run([character.id], [])}
     />
   ) : (
     <AlertPanel
-      title={`Send ${name} offstage?`}
-      description={`${name} stops thinking and acting. Anything sent to them waits for when they come back onstage.`}
+      title={`Make ${name} inactive?`}
+      description={`${name} stops thinking and acting. Anything sent to them waits for when they become active again.`}
       onConfirm={() => void run([], [character.id])}
     />
   );
@@ -272,16 +272,16 @@ function StageMany({
   };
 
   const summary = [
-    comingOn.length ? `${comingOn.length} step on` : null,
-    goingOff.length ? `${goingOff.length} step off` : null,
+    comingOn.length ? `${comingOn.length} active` : null,
+    goingOff.length ? `${goingOff.length} inactive` : null,
   ]
     .filter(Boolean)
     .join(", ");
 
   return (
     <DialogPanel
-      title={"Who's onstage"}
-      description="Onstage characters think, act and spend tokens. Offstage characters are frozen until brought back onstage."
+      title={"Who's active"}
+      description="Active characters think, act and spend tokens. Inactive characters are frozen until made active again."
       className="sm:h-[min(40rem,90dvh)]"
       full
       footer={
@@ -346,9 +346,7 @@ function StageMany({
       </div>
 
       <p className="flex-none text-[0.8125rem] leading-normal text-pretty text-ui-soft">
-        {changes === 0
-          ? "Tick who should be onstage."
-          : `${summary}. ${onNote}`}
+        {changes === 0 ? "Tick who should be active." : `${summary}. ${onNote}`}
       </p>
     </DialogPanel>
   );

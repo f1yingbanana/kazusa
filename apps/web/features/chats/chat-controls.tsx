@@ -186,11 +186,11 @@ function useCandidates(chat: Chat): readonly PickGroup[] {
       const item = (one: (typeof cast)[number]) =>
         castPickItem(
           one,
-          one.offstage ? "Offstage: won't reply right away" : undefined,
+          one.offstage ? "Inactive: won't reply right away" : undefined,
         );
       return [
-        { label: "Onstage", items: cast.filter((c) => !c.offstage).map(item) },
-        { label: "Offstage", items: cast.filter((c) => c.offstage).map(item) },
+        { label: "Active", items: cast.filter((c) => !c.offstage).map(item) },
+        { label: "Inactive", items: cast.filter((c) => c.offstage).map(item) },
       ].filter((group) => group.items.length > 0);
     }
     const talking = new Map<string, readonly string[]>();

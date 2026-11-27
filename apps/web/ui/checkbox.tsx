@@ -11,6 +11,31 @@ import { cx } from "./cx";
 
 export { createCheckboxGroupController } from "@ui-sdk/react/checkbox";
 
+const BOX =
+  "grid size-4.5 shrink-0 place-items-center rounded-[0.375rem] bg-ui-surface inset-ring-2 inset-ring-ui-line transition-[background-color,box-shadow,transform] duration-150 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-primary active:scale-90 data-indeterminate:bg-ui-primary data-indeterminate:text-ui-on-primary data-indeterminate:inset-ring-0 data-checked:bg-ui-primary data-checked:text-ui-on-primary data-checked:inset-ring-0 data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50";
+
+/** Standalone checkbox box wrapping ui-sdk Checkbox + CheckboxIndicator. */
+export function CheckBox({
+  className,
+  ...props
+}: Omit<ComponentProps<typeof Checkbox>, "className" | "children"> & {
+  className?: string;
+}) {
+  return (
+    <Checkbox {...props} className={cx(BOX, className)}>
+      <CheckboxIndicator className="grid place-items-center motion-safe:animate-ui-pop">
+        {(state) =>
+          state.indeterminate ? (
+            <MinusIcon aria-hidden className="size-3" strokeWidth={3} />
+          ) : (
+            <CheckIcon aria-hidden className="size-3" strokeWidth={3} />
+          )
+        }
+      </CheckboxIndicator>
+    </Checkbox>
+  );
+}
+
 export function CheckList<T extends string>({
   label,
   className,
@@ -72,7 +97,7 @@ export function CheckRow({
         defaultChecked={defaultChecked}
         onCheckedChange={onCheckedChange}
         disabled={disabled}
-        className="grid size-4.5 shrink-0 place-items-center rounded-[0.375rem] bg-ui-surface inset-ring-2 inset-ring-ui-line transition-colors duration-150 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-primary data-indeterminate:bg-ui-primary data-indeterminate:text-ui-on-primary data-indeterminate:inset-ring-0 data-checked:bg-ui-primary data-checked:text-ui-on-primary data-checked:inset-ring-0"
+        className={BOX}
       >
         <CheckboxIndicator className="grid place-items-center">
           {(state) =>

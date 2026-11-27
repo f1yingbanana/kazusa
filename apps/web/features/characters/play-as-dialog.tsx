@@ -141,7 +141,7 @@ function PlayAsForm({
         : "You're watching now."
       : [
           next
-            ? `You take over ${firstName(next.name)}: they say and do only what you choose, and come onstage if they were off.`
+            ? `You take over ${firstName(next.name)}: they say and do only what you choose, and become active if they were inactive.`
             : "You stop playing and watch.",
           current
             ? `${firstName(current.name)} goes back to thinking for themselves, after looking back on what you did as them.`

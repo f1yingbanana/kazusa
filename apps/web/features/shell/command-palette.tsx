@@ -543,7 +543,7 @@ function usePaletteEntries({
           character.kind === "npc"
             ? "NPC"
             : offstage
-              ? "Offstage"
+              ? "Inactive"
               : (groups[0] ?? undefined),
         character,
         icon: (

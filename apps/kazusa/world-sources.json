@@ -14,11 +14,6 @@
       "id": "genshin-impact",
       "provider": "git",
       "url": "https://github.com/f1yingbanana/kazusa-genshin-impact.git"
-    },
-    {
-      "id": "starter",
-      "provider": "git",
-      "url": "https://github.com/f1yingbanana/kazusa-new-world.git"
     }
   ]
 }
